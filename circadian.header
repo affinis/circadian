@@ -1,0 +1,65 @@
+FEATURE
+Physical library ID
+Estimated number of cells
+Mean reads per cell
+Physical library ID
+Number of reads
+Valid barcodes
+Valid UMIs
+Sequencing saturation
+Confidently mapped reads in cells
+Mean reads per cell
+Physical library ID
+Number of reads in the library
+Mapped to genome
+Confidently mapped to genome
+Confidently mapped to transcriptome
+Confidently mapped to intronic regions
+Confidently mapped to exonic regions
+Confidently mapped to intergenic regions
+Confidently mapped antisense
+Physical library ID
+Estimated number of T cells
+Mean reads per T cell
+Physical library ID
+Reads mapped to any T cell V(D)J gene
+Reads mapped to TRA
+Reads mapped to TRB
+Physical library ID
+Number of T cell reads
+Valid T cell barcodes
+Mean reads per T cell
+Mean used reads per T cell
+Fraction reads in T cells
+Physical library ID
+Estimated number of B cells
+Mean reads per B cell
+Physical library ID
+Reads mapped to any B cell V(D)J gene
+Reads mapped to IGH
+Reads mapped to IGK
+Reads mapped to IGL
+Physical library ID
+Number of B cell reads
+Valid B cell barcodes
+Mean reads per B cell
+Mean used reads per B cell
+Fraction reads in B cells
+Cells
+Median reads per cell
+Median genes per cell
+Total genes detected
+Median UMI counts per cell
+Confidently mapped reads in cells
+T cells with productive V-J spanning pair
+T cells with productive V-J spanning (TRA, TRB) pair
+T cells with productive TRA contig
+T cells with productive TRB contig
+T cells paired clonotype diversity
+B cells with productive V-J spanning pair
+B cells with productive V-J spanning (IGK, IGH) pair
+B cells with productive V-J spanning (IGL, IGH) pair
+B cells with productive IGH contig
+B cells with productive IGK contig
+B cells with productive IGL contig
+B cells paired clonotype diversity
