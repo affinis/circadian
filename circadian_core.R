@@ -1,6 +1,14 @@
+# Set this option BEFORE installing CRAN packages
+# options(repos = c(
+#   CRAN = "https://cloud.r-project.org",
+#   Bioc = BiocManager::repositories()
+# ))
+
 library(Seurat)
 library(SeuratObject)
+# remotes::install_github("satijalab/seurat-data", quiet = TRUE)
 library(SeuratData)
+# remotes::install_github("mojaveazure/seurat-disk")
 library(SeuratDisk)
 library(devtools)
 library(anndata)
@@ -9,18 +17,21 @@ library(biomaRt)
 library(tidyverse)
 library(hash)
 library(zeitgebr)
-library(velocyto.R)
+# install_github("velocyto-team/velocyto.R")
+# library(velocyto.R)
 library(pagoda2)
 library(groupdata2)
 library(RColorBrewer)
 library(MetaCycle)
+# remotes::install_github("satijalab/azimuth", quiet = TRUE)
 library(Azimuth)
 library(vegan)
 library(doParallel)
 library(foreach)
 library(clusterProfiler)
-library("destiny")
+library(destiny)
 library(ggcorrplot)
+# devtools::install_github("micnngo/tauFisher", build_vignettes = TRUE) 
 library(tauFisher)
 library(VennDiagram)
 library(grid)
@@ -33,21 +44,22 @@ library(ReactomePA)
 library(ggrepel)
 library(tidygraph)
 library(ggraph)
+# devtools::install_github("ricardo-bion/ggradar", dependencies = TRUE)
 library(ggradar)
 library(topGO)
 library(dorothea)
 
-SCRIPTS<-"/lustre/home/acct-medll/medll/script/Rscript/wrapper_script"
+SCRIPTS<-"/tmpdata/LyuLin/script/wrapper_script"
 source(paste(SCRIPTS,"seuratWrapper.R",sep="/"))
 source(paste(SCRIPTS,"seuratIntegrateWrapper.R",sep="/"))
-source('~/script/Rscript/ggplot2_core.R')
+source('/tmpdata/LyuLin/script/circadian/ggplot2_core.R')
 
 #:::::::::::::::::::::#
 # GLOBAL VARs/SETTINGs
 #:::::::::::::::::::::#
 
-setwd('/lustre/home/acct-medll/medll/data/cellranger_out/')
-HOME="/lustre/home/acct-medll/medll/data/cellranger_out/"
+setwd('/tmpdata/LyuLin/analysis/circadian/cellranger')
+HOME='/tmpdata/LyuLin/analysis/circadian/cellranger'
 INTERNAL_CONTROL<-c("ACTB","GAPDH","B2M","RPLP0","TBP","HPRT1","PPIA")
 time_point<-c(9,13,17,21,1,5)
 time_point_inorder<-c(1,5,9,13,17,21)
@@ -103,7 +115,14 @@ celltypes_NI<-c("B_naive","CD14⁺Monocytes","CD16⁺Monocytes","CD4_naive_CCR7"
 # I/O FUNCTIONS
 #:::::::::: :::#
 
-#get merged JTK_cycle outs
+# function: readMergedJTK
+# get merged JTK_cycle outs
+# outpath: a folder path containing block1, block2 ...
+# wanted.celltypes: desired celltype
+# caller: NSF
+# dependency: getJTK_CYCLEouts
+# upstream: NSF
+# downstream: 
 readMergedJTK<-function(outpath,wanted.celltypes){
   JTK_CYCL=NULL
   for(block_data in list.files(outpath)){
@@ -119,12 +138,18 @@ readMergedJTK<-function(outpath,wanted.celltypes){
   }
   return(JTK_CYCL)
 }
- 
-#merge cell annotations
-#inputs are annotated srt *.rds file
-#output is a *.tsv
-#note that Platelet is not included so for cells whose toplevel annotation is Platelet, it will not be included
-#in the final tsv file
+
+# function: generateAnnotationFile
+# merge cell annotations
+# input: annotated srt *.rds file (TNK.file,B.file,Myeloid.file)
+# output: *.tsv
+# note that Platelet is not included so for cells whose toplevel annotation is Platelet, it will not be included in the final tsv file.
+# cols: colnames wanted in seurat object@meta.data
+##
+# caller: NSF
+# dependency: NSF
+# upstream: TypeCluster
+# downstream: NSF
 generateAnnotationFile<-function(TNK.file,B.file,Myeloid.file,cols,new.colnames=NULL){
   message("reading TNK file")
   TNK=readRDS(TNK.file)
@@ -146,9 +171,15 @@ generateAnnotationFile<-function(TNK.file,B.file,Myeloid.file,cols,new.colnames=
   write_delim(all.meta,'../analysis/cell.annotations.tsv',delim = '\t')
 }
 
-#patient_id: example: TFSH190500A_HZD
-#return a list of loom Matrix
-#downstream: mergeSplicedData, merge matrix of different time points into a single one
+# get a day's (6 samples) spliced data from an individual 
+# patient_id: example: TFSH190500A_HZD
+# cells: a vector of cell barcode to include in final data, default is NULL (all cells included)
+# output: return a list of loom Matrix
+##
+# caller: getMultipleWholeDaySplicedData
+# dependency: subsetLoomMatrix
+# upstream: NSF
+# downstream: mergeSplicedData (merge matrix of different time points into a single one)
 getWholeDaySplicedData<-function(patient_id,cells=NULL){
   res=list()
   for(i in 1:6){
@@ -168,6 +199,14 @@ getWholeDaySplicedData<-function(patient_id,cells=NULL){
   return(res)
 }
 
+# get a day's (6 samples) spliced data from multiple individual 
+# individuals: a vector of string indicating different individuals, example: TFSH190500A_HZD
+# output: return a list of loom Matrix
+##
+# caller: NSF
+# dependency: getWholeDaySplicedData
+# upstream: NSF
+# downstream: mergeSplicedData (merge matrix of different time points into a single one)
 getMultipleWholeDaySplicedData<-function(individuals){
   res=list()
   for(individual in individuals){
