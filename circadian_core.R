@@ -48,6 +48,8 @@ library(ggraph)
 library(ggradar)
 library(topGO)
 library(dorothea)
+# remotes::install_github('chris-mcginnis-ucsf/DoubletFinder', force = TRUE)
+library(DoubletFinder)
 
 SCRIPTS<-"/tmpdata/LyuLin/script/wrapper_script"
 source(paste(SCRIPTS,"seuratWrapper.R",sep="/"))

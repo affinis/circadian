@@ -2290,4 +2290,53 @@ test <- FindClusters(test, resolution = 2, cluster.name = "harmony_clusters")
 test <- RunUMAP(test, reduction = "harmony", dims = 1:30, reduction.name = "umap.harmony")
 DimPlot(test, reduction = "umap.harmony", group.by = c("sample", "type"))
 
+## demux 4 sample mix
+source('/tmpdata/LyuLin/script/demuxer/src/demux_core_functions.R')
+sample_path="/tmpdata/LyuLin/analysis/circadian/cellranger/X5_250409MIX01/outs/per_sample_outs/X5_250409MIX01/count/sample_filtered_feature_bc_matrix/"
+srt<-seuratWrap1(sample_path,min.features = 500)
+srt<-seuratWrap2(srt)
+srt<-seuratWrap3(srt,res = 0.01)
+DimPlot(srt)
 
+sc_merged0<-readAFFileWithFiltering('/tmpdata/LyuLin/analysis/circadian/cellranger/X5_250424MIX02/outs/per_sample_outs/X5_250424MIX02/count',sc.mode = T)
+sc_merged<-sc_merged0
+std<-readAFStandard('/tmpdata/LyuLin/analysis/circadian/RNASeq')
+sc_merged<-filterInformativePositionsBySTD(sc_merged,std[c(1,2,3,4,6)])
+sc_merged<-filterDoublet(sc_merged,threshould = 1)
+sc_merged<-callExactBase(sc_merged)
+demux_out<-demuxBySTD(sc_merged,std[c(1,2,3,4,6)])
+demux_out<-demux('/tmpdata/LyuLin/analysis/circadian/cellranger/X5_250424MIX02/outs/per_sample_outs/X5_250424MIX02/count','/tmpdata/LyuLin/analysis/circadian/RNASeq')
+
+srt<-AddMetaData(srt,demux_out,col.name = "individual")
+srt@meta.data[is.na(srt@meta.data$individual),"individual"]<-"doublet"
+srt@meta.data$CT<-case_when(srt@meta.data$individual == "KD" ~ "CT15",
+                            srt@meta.data$individual == "ZYR" ~ "CT15",
+                            srt@meta.data$individual == "JJC" ~ "CT19",
+                            srt@meta.data$individual == "LYH" ~ "CT15",
+                            TRUE ~ "unknown")
+new_cell_ids <- paste0("TF_",srt@meta.data$individual,"_",srt@meta.data$CT,"_", colnames(srt))
+srt@meta.data$orig.ident=rownames(srt@meta.data)
+srt<-RenameCells(srt,new.names = new_cell_ids)
+saveRDS(srt,'/tmpdata/LyuLin/analysis/circadian/R/X5_250409MIX01.demuxed.rds')
+
+srt$individual %>% table %>% as.data.frame() %>% ggplot() + 
+  geom_bar(aes(x=get("."),y=Freq),stat="identity",fill="blue",color="black",width=0.75,)+
+  theme_cowplot()+theme(axis.text.x = element_text(angle=60,hjust=1),title = element_text(size = 12,face = "plain"))+
+  xlab("")+ylab("# of cell")+scale_x_discrete(limit=c("JJC","KD","LYH","ZYR","unknown","doublet"))+
+  geom_text(aes(x=get("."),y=Freq+700,label=Freq))+scale_y_continuous(expand = c(0,0),limits = c(0,20000))+
+  ggtitle("demultiplex with SNP on chrM\nedit dist = 0")
+DimPlot(srt,group.by = "individual")
+srt@meta.data %>% ggplot(.)+geom_violin(aes(x=individual,y=nCount_RNA,fill=individual))+ylim(c(0,30000))+
+  scale_x_discrete(limit=c("doublet","JJC","KD","LYH","ZYR","unknown"))+theme_linedraw()+
+  theme(axis.text.x = element_text(angle = 60,hjust = 1))
+
+srt@meta.data %>% ggplot(.)+geom_violin(aes(x=individual,y=nFeature_RNA,fill=individual))+
+  scale_x_discrete(limit=c("doublet","JJC","KD","LYH","ZYR","unknown"))+theme_linedraw()+
+  theme(axis.text.x = element_text(angle = 60,hjust = 1))
+
+# use single sample to see performance of filterDoublet
+sc_merged0<-readAFFileWithFiltering('~/Downloads/ZXL.allele.freq.cell.tsv',sc.mode = T)
+sc_merged<-sc_merged0
+std<-readAFStandard('/tmpdata/LyuLin/analysis/circadian/RNASeq')
+sc_merged<-filterInformativePositionsBySTD(sc_merged,std[c(1,2,3,4,6)])
+sc_merged<-filterDoublet(sc_merged,plt.db.score = c(-0.1,20))
