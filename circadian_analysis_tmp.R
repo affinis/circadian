@@ -2292,39 +2292,41 @@ DimPlot(test, reduction = "umap.harmony", group.by = c("sample", "type"))
 
 ## demux 4 sample mix
 source('/tmpdata/LyuLin/script/demuxer/src/demux_core_functions.R')
-sample_path="/tmpdata/LyuLin/analysis/circadian/cellranger/X5_250409MIX01/outs/per_sample_outs/X5_250409MIX01/count/sample_filtered_feature_bc_matrix/"
+sample_path="/tmpdata/LyuLin/analysis/circadian/cellranger/X5_250424MIX07/outs/per_sample_outs/X5_250424MIX07/count/sample_filtered_feature_bc_matrix/"
 srt<-seuratWrap1(sample_path,min.features = 500)
 srt<-seuratWrap2(srt)
 srt<-seuratWrap3(srt,res = 0.01)
 DimPlot(srt)
 
-sc_merged0<-readAFFileWithFiltering('/tmpdata/LyuLin/analysis/circadian/cellranger/X5_250424MIX02/outs/per_sample_outs/X5_250424MIX02/count',sc.mode = T)
-sc_merged<-sc_merged0
-std<-readAFStandard('/tmpdata/LyuLin/analysis/circadian/RNASeq')
-sc_merged<-filterInformativePositionsBySTD(sc_merged,std[c(1,2,3,4,6)])
-sc_merged<-filterDoublet(sc_merged,threshould = 1)
-sc_merged<-callExactBase(sc_merged)
-demux_out<-demuxBySTD(sc_merged,std[c(1,2,3,4,6)])
-demux_out<-demux('/tmpdata/LyuLin/analysis/circadian/cellranger/X5_250424MIX02/outs/per_sample_outs/X5_250424MIX02/count','/tmpdata/LyuLin/analysis/circadian/RNASeq')
+#sc_merged0<-readAFFileWithFiltering('/tmpdata/LyuLin/analysis/circadian/cellranger/X5_250424MIX02/outs/per_sample_outs/X5_250424MIX02/count',sc.mode = T)
+#sc_merged<-sc_merged0
+#std<-readAFStandard('/tmpdata/LyuLin/analysis/circadian/RNASeq')
+#sc_merged<-filterInformativePositionsBySTD(sc_merged,std[c(1,2,3,4,6)])
+#sc_merged<-filterDoublet(sc_merged,threshould = 1)
+#sc_merged<-callExactBase(sc_merged)
+#demux_out<-demuxBySTD(sc_merged,std[c(1,2,3,4,6)])
+demux_out<-demux('/tmpdata/LyuLin/analysis/circadian/cellranger/X5_250424MIX07/outs/per_sample_outs/X5_250424MIX07/count','/tmpdata/LyuLin/analysis/circadian/RNASeq')
 
 srt<-AddMetaData(srt,demux_out,col.name = "individual")
 srt@meta.data[is.na(srt@meta.data$individual),"individual"]<-"doublet"
-srt@meta.data$CT<-case_when(srt@meta.data$individual == "KD" ~ "CT15",
-                            srt@meta.data$individual == "ZYR" ~ "CT15",
-                            srt@meta.data$individual == "JJC" ~ "CT19",
-                            srt@meta.data$individual == "LYH" ~ "CT15",
+srt@meta.data$CT<-case_when(srt@meta.data$individual == "KD" ~ "CT19",
+                            srt@meta.data$individual == "ZYR" ~ "CT19",
+                            srt@meta.data$individual == "JJC" ~ "CT11",
+                            srt@meta.data$individual == "LYH" ~ "CT19",
                             TRUE ~ "unknown")
 new_cell_ids <- paste0("TF_",srt@meta.data$individual,"_",srt@meta.data$CT,"_", colnames(srt))
 srt@meta.data$orig.ident=rownames(srt@meta.data)
 srt<-RenameCells(srt,new.names = new_cell_ids)
-saveRDS(srt,'/tmpdata/LyuLin/analysis/circadian/R/X5_250409MIX01.demuxed.rds')
+DimPlot(srt,group.by = "individual")
+saveRDS(srt,'/tmpdata/LyuLin/analysis/circadian/R/X5_250424MIX07.demuxed.rds')
 
 srt$individual %>% table %>% as.data.frame() %>% ggplot() + 
   geom_bar(aes(x=get("."),y=Freq),stat="identity",fill="blue",color="black",width=0.75,)+
-  theme_cowplot()+theme(axis.text.x = element_text(angle=60,hjust=1),title = element_text(size = 12,face = "plain"))+
+  theme(axis.text.x = element_text(angle=60,hjust=1))+
   xlab("")+ylab("# of cell")+scale_x_discrete(limit=c("JJC","KD","LYH","ZYR","unknown","doublet"))+
-  geom_text(aes(x=get("."),y=Freq+700,label=Freq))+scale_y_continuous(expand = c(0,0),limits = c(0,20000))+
-  ggtitle("demultiplex with SNP on chrM\nedit dist = 0")
+  geom_text(aes(x=get("."),y=Freq+1000,label=Freq))+scale_y_continuous(expand = c(0,0),limits = c(0,20000))+
+  ggtitle("sample: X5_250424MIX06\ndemultiplex with SNP on chrM\nedit dist = 0")+
+  theme(title = element_text(size = 8,face = "plain",family="Arial"),axis.title = element_text(size=12))
 DimPlot(srt,group.by = "individual")
 srt@meta.data %>% ggplot(.)+geom_violin(aes(x=individual,y=nCount_RNA,fill=individual))+ylim(c(0,30000))+
   scale_x_discrete(limit=c("doublet","JJC","KD","LYH","ZYR","unknown"))+theme_linedraw()+
@@ -2340,3 +2342,184 @@ sc_merged<-sc_merged0
 std<-readAFStandard('/tmpdata/LyuLin/analysis/circadian/RNASeq')
 sc_merged<-filterInformativePositionsBySTD(sc_merged,std[c(1,2,3,4,6)])
 sc_merged<-filterDoublet(sc_merged,plt.db.score = c(-0.1,20))
+
+# manual annotation level1, multiplexed sample (batch3)
+setwd('/tmpdata/LyuLin/analysis/circadian/R')
+srt<-mergeMultiplexedSamplesByID(
+  dir.path='/tmpdata/LyuLin/analysis/circadian/R',
+  sample.ids=c("X5_250409MIX01","X5_250424MIX02","X5_250424MIX03",
+               "X5_250424MIX04","X5_250424MIX05","X5_250424MIX06",
+               "X5_250424MIX07")
+  )
+srt<-dimentionalReductionMergedSrt(srt)
+DimPlot(srt,label = T)
+# forget to add sample column in previous step, manually add it, and previous pipeline has been modified
+#srt$sample<-case_when(paste0(srt$individual,srt$CT) %in% c("KDCT15","ZYRCT15","JJCCT19","LYHCT15") ~ "X5_250409MIX01",
+#                      paste0(srt$individual,srt$CT) %in% c("KDCT35","ZYRCT27","JJCCT15","LYHCT27") ~ "X5_250424MIX02",
+#                      paste0(srt$individual,srt$CT) %in% c("KDCT23","ZYRCT23","JJCCT35","LYHCT31") ~ "X5_250424MIX03",
+#                      paste0(srt$individual,srt$CT) %in% c("KDCT31","ZYRCT11","JJCCT31","LYHCT23") ~ "X5_250424MIX04",
+#                      paste0(srt$individual,srt$CT) %in% c("KDCT27","ZYRCT31","JJCCT23","LYHCT11") ~ "X5_250424MIX05",
+#                      paste0(srt$individual,srt$CT) %in% c("KDCT11","ZYRCT35","JJCCT27","LYHCT35") ~ "X5_250424MIX06",
+#                      paste0(srt$individual,srt$CT) %in% c("KDCT19","ZYRCT19","JJCCT11","LYHCT19") ~ "X5_250424MIX07")
+srt<-integrateMergedSrt(srt)
+saveRDS(srt,"/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.rds")
+
+DimPlot(srt,label = T)
+FeaturePlot(srt,MAIN_GROUP_MARKERS)
+srt<-TypeCluster(srt,cluster = c(0,2,3,4,6,7,9,10,11),type = "TNK",new.meta = "manual.level1")
+srt<-TypeCluster(srt,cluster = c(5,12),type = "B",new.meta = "manual.level1")
+srt<-TypeCluster(srt,cluster = c(1,8,13,15),type = "Myeloid",new.meta = "manual.level1")
+srt<-TypeCluster(srt,cluster = c(14),type = "Stem",new.meta = "manual.level1")
+DimPlot(srt,label = T,group.by = "manual.level1")
+
+srt.B<-subset(srt,manual.level1=="B")
+srt.B<-dimentionalReductionSubsetSrt(srt.B)
+srt.B<-integrateSubset(srt.B)
+DimPlot(srt.B,label = T)
+srt.B<-TypeCluster(srt.B,cluster = c(4,7,9),type = "doublet",new.meta = "manual.level2")
+srt.B<-TypeCluster(srt.B,cluster = c(4,7,9),type = "doublet",new.meta = "manual.level1")
+srt.B<-TypeCluster(srt.B,cluster = c(1),type = "cB01_TCL1A+B_naive",new.meta = "manual.level2")
+srt.B<-TypeCluster(srt.B,cluster = c(0,2,3,8),type = "cB03_IgG+IgA+B_memory",new.meta = "manual.level2")
+srt.B<-TypeCluster(srt.B,cluster = c(5,10,11),type = "cB04_Plasma",new.meta = "manual.level2")
+srt.B<-TypeCluster(srt.B,cluster = c(6),type = "debris",new.meta = "manual.level2")
+srt.B<-TypeCluster(srt.B,cluster = c(6),type = "debris",new.meta = "manual.level1")
+DimPlot(srt.B,label = T,group.by = "manual.level2")
+
+srt.B<-TypeCluster(srt.B,cluster = c(4,7,9),type = "doublet",new.meta = "manual_NI")
+srt.B<-TypeCluster(srt.B,cluster = c(1),type = "B_naive",new.meta = "manual_NI")
+srt.B<-TypeCluster(srt.B,cluster = c(0,2,3,8),type = "B_memory",new.meta = "manual_NI")
+srt.B<-TypeCluster(srt.B,cluster = c(5,10,11),type = "Plasma cell",new.meta = "manual_NI")
+srt.B<-TypeCluster(srt.B,cluster = c(6),type = "debris",new.meta = "manual_NI")
+DimPlot(srt.B,label = T,group.by = "manual_NI")
+saveRDS(srt.B,"/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.B.rds")
+
+
+srt.T<-subset(srt,manual.level1=="TNK")
+srt.T<-dimentionalReductionSubsetSrt(srt.T)
+srt.T<-integrateSubset(srt.T)
+
+srt.T<-FindClusters(srt.T,resolution =1 )
+DimPlot(srt.T,label = T)
+
+srt.T<-TypeCluster(srt.T,cluster = c(24),type = "doublet",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(24),type = "doublet",new.meta = "manual.level1")
+srt.T<-TypeCluster(srt.T,cluster = c(0,1,12,25,33),type = "cTNK01_CD4+CCR7+Tn",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(3,10),type = "cTNK02_CD8+CCR7+Tn",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(4,6,8,39),type = "cTNK03_CD4+PTGER2+Tcm",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(11,16,37),type = "cTNK04_CD8+GZMK+Tem",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(2,9,13,17,19,20,27),type = "cTNK05_GNLY+NK",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(7,38),type = "cTNK06_gdT",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(5,32,36),type = "cTNK07_CD8+SLC4A10+MAIT",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(30),type = "cTNK08_CD4+NKG7+CTL",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(21),type = "cTNK09_CD4+FOXP3+Treg",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(26),type = "cTNK10_MKI67+proliferating",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(28),type = "cTNK11_LYST+dnT",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(29),type = "cTNK12_CD8+cTRBV+Tcm-like",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(22),type = "cTNK13_CD8+IKZF2+IEL",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(14,18,23,31,34),type = "cTNK14_CD8+GZMH+TEMRA/TEFF",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(15,35),type = "debris",new.meta = "manual.level2")
+srt.T<-TypeCluster(srt.T,cluster = c(15,35),type = "debris",new.meta = "manual.level1")
+DimPlot(srt.T,label = T,group.by = "manual.level2")
+
+srt.T<-TypeCluster(srt.T,cluster = c(24),type = "doublet",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(1,33),type = "CD4_TCM_AQP3",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(6,8,39),type = "CD4_TEM_ANXA1",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(30),type = "CD4_TEM_GNLY",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(4),type = "CD4_TEM_GZMK",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(21),type = "CD4_Treg_FOXP3",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(0,12,25),type = "CD4_naive_CCR7",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(5,32,36),type = "CD8_MAIT_SLC4A10",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(11,16,29,37),type = "CD8_TEM_CMC1",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(14,18,23,31,34),type = "CD8_TEM_GNLY",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(22),type = "CD8_TEM_ZNF683",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(3,10),type = "CD8_naive_LEF1",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(17,20),type = "NK_CD56ᵇʳⁱᵍʰᵗ",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(2,9,13,19,27),type = "NK_CD56ᵈⁱᵐ",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(26),type = "TNK_proliferatig_MKI67",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(28),type = "dnT_LYST",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(7,38),type = "γδT",new.meta = "manual_NI")
+srt.T<-TypeCluster(srt.T,cluster = c(15,35),type = "debris",new.meta = "manual_NI")
+DimPlot(srt.T,label = T,group.by = "manual_NI")
+saveRDS(srt.T,"/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.TNK.rds")
+
+srt.M<-subset(srt,manual.level1=="Myeloid")
+srt.M<-dimentionalReductionSubsetSrt(srt.M)
+srt.M<-integrateSubset(srt.M)
+DimPlot(srt.M,label = T)
+
+srt.M<-TypeCluster(srt.M,cluster = c(5,6,7),type = "doublet",new.meta = "manual.level2")
+srt.M<-TypeCluster(srt.M,cluster = c(5,6,7),type = "doublet",new.meta = "manual.level1")
+srt.M<-TypeCluster(srt.M,cluster = c(0,1,2,8),type = "cM01_CD14+FCGR3A-Monocyte",new.meta = "manual.level2")
+srt.M<-TypeCluster(srt.M,cluster = c(3),type = "cM02_CD14-FCGR3A+Monocyte",new.meta = "manual.level2")
+srt.M<-TypeCluster(srt.M,cluster = c(11),type = "cM03_CLEC9A+cDC1",new.meta = "manual.level2")
+srt.M<-TypeCluster(srt.M,cluster = c(4),type = "cM04_FCER1A+cDC2",new.meta = "manual.level2")
+srt.M<-TypeCluster(srt.M,cluster = c(10),type = "cM05_LILRA4+pDC",new.meta = "manual.level2")
+srt.M<-TypeCluster(srt.M,cluster = c(9),type = "debris",new.meta = "manual.level2")
+srt.M<-TypeCluster(srt.M,cluster = c(9),type = "debris",new.meta = "manual.level1")
+DimPlot(srt.M,label = T,group.by = "manual.level2")
+
+srt.M<-TypeCluster(srt.M,cluster = c(5,6,7),type = "doublet",new.meta = "manual_NI")
+srt.M<-TypeCluster(srt.M,cluster = c(5,6,7),type = "doublet",new.meta = "manual_NI")
+srt.M<-TypeCluster(srt.M,cluster = c(0,1,2,8),type = "CD14⁺Monocytes",new.meta = "manual_NI")
+srt.M<-TypeCluster(srt.M,cluster = c(3),type = "CD16⁺Monocytes",new.meta = "manual_NI")
+srt.M<-TypeCluster(srt.M,cluster = c(4,11),type = "mDC",new.meta = "manual_NI")
+srt.M<-TypeCluster(srt.M,cluster = c(10),type = "pDC",new.meta = "manual_NI")
+srt.M<-TypeCluster(srt.M,cluster = c(9),type = "debris",new.meta = "manual_NI")
+srt.M<-TypeCluster(srt.M,cluster = c(9),type = "debris",new.meta = "manual_NI")
+DimPlot(srt.M,label = T,group.by = "manual_NI")
+
+saveRDS(srt.M,"/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.M.rds")
+
+srt.S<-subset(srt,manual.level1=="Stem")
+srt.S<-dimentionalReductionSubsetSrt(srt.S)
+srt.S<-integrateSubset(srt.S)
+DimPlot(srt.S,label = T)
+
+srt.S<-TypeCluster(srt.S,cluster = c(0,4,5,6),type = "doublet",new.meta = "manual.level2")
+srt.S<-TypeCluster(srt.S,cluster = c(0,4,5,6),type = "doublet",new.meta = "manual.level1")
+srt.S<-TypeCluster(srt.S,cluster = c(1,2,3),type = "cS01_CD34+HSPC",new.meta = "manual.level2")
+srt.S<-TypeCluster(srt.S,cluster = c(7),type = "cM05_MS4A2+Granulocyte",new.meta = "manual.level2")
+DimPlot(srt.S,label = T,group.by = "manual.level2")
+
+srt.S<-TypeCluster(srt.S,cluster = c(0,4,5,6),type = "doublet",new.meta = "manual_NI")
+srt.S<-TypeCluster(srt.S,cluster = c(1,2,3),type = "HSC_CD34",new.meta = "manual_NI")
+srt.S<-TypeCluster(srt.S,cluster = c(7),type = "MS4A2_Granulocyte",new.meta = "manual_NI")
+DimPlot(srt.S,label = T,group.by = "manual_NI")
+
+saveRDS(srt.S,"/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.S.rds")
+
+setwd('/tmpdata/LyuLin/analysis/circadian/R/')
+generateAnnotationFile('7mixed.integrated.TNK.rds','7mixed.integrated.B.rds',
+                       '7mixed.integrated.M.rds','7mixed.integrated.S.rds',
+                       cols = c("manual.level1","manual.level2","manual_NI"),
+                       out.path = "cell.annotation.7mixed.integrated.tsv")
+ 
+annotation.meta<-read.delim('cell.annotation.7mixed.integrated.tsv',header = T)
+rownames(annotation.meta)<-annotation.meta$cell_id
+srt<-AddMetaData(srt,annotation.meta)
+srt$type<-srt$manual.level2
+
+#found that LYH CT31 was wrongly assingned as CT21
+srt@meta.data[srt@meta.data$CT=="CT21","CT"]<-"CT31"
+old.cell.ids<-Cells(srt)
+new.cell.ids<-gsub("CT21","CT31",old.cell.ids)
+srt<-RenameCells(srt,new.names = new.cell.ids)
+srt@meta.data[c("CT","individual")] %>% table()
+
+saveRDS(srt,"7mixed.integrated.annotated.raw.rds")
+
+srt<-subset(srt,doublet_score<=1&manual.level1!="doublet"&manual.level1!="debris")
+saveRDS(srt,"7mixed.integrated.annotated.clean.rds")
+
+srt<-SCTransform(srt)
+saveRDS(srt,"7mixed.integrated.annotated.clean.sct.rds")
+
+srt<-readRDS('7mixed.integrated.annotated.clean.sct.rds')
+srt<-RunAzimuth(srt, reference = "pbmcref")
+srt<-modAzimuthAnnotation(srt)
+saveRDS(srt,"7mixed.integrated.annotated.clean.sct.Azimuth.rds")
+
+srt$type<-srt$predicted.celltype.l1.5
+DefaultAssay(srt)<-"RNA"
+plotPseudobulkByCTByIndividual(srt,"CD16 Mono","NR1D2",normalize.data = T,
+                               time.points = c("CT11","CT15","CT19","CT23","CT27","CT31","CT35"))

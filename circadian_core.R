@@ -62,6 +62,7 @@ source('/tmpdata/LyuLin/script/circadian/ggplot2_core.R')
 
 setwd('/tmpdata/LyuLin/analysis/circadian/cellranger')
 HOME='/tmpdata/LyuLin/analysis/circadian/cellranger'
+INTERNAL_CONTROL<-c("CDK4")
 INTERNAL_CONTROL<-c("ACTB","GAPDH","B2M","RPLP0","TBP","HPRT1","PPIA")
 time_point<-c(9,13,17,21,1,5)
 time_point_inorder<-c(1,5,9,13,17,21)
@@ -84,7 +85,7 @@ CIRCADIAN_GENES_PMID_38190520<-c("SERTAD1","ZNF101","PHF21A","STMN3","GNG2","IL1
                          "AVIL","SMAP2","CDC42EP2","NUDT5","EPHX2","MKNK2","SFXN2",
                          "SESN2","PRRG4")
 
-MAIN_GROUP_MARKERS<-c("CD3D","MS4A1","GNLY","JCHAIN","CD4","CD8A","CD14","FCGR3A","MS4A2","PECAM1")
+MAIN_GROUP_MARKERS<-c("CD3D","GNLY","MS4A1","JCHAIN","CD14","MS4A2","PECAM1","CD34","PPBP")
 
 SUBSET_MARKERS<-c("MS4A1","CD27","TCL1A","JCHAIN","EGR1","CD79A","CD19","IGHD","IGHA1",
                   "FCN1","CD14","S100A8","FCGR3A","C1QA","FCER1G","LILRA4","CD1C","CLEC9A",
@@ -117,7 +118,7 @@ celltypes_NI<-c("B_naive","CD14⁺Monocytes","CD16⁺Monocytes","CD4_naive_CCR7"
 # I/O FUNCTIONS
 #:::::::::: :::#
 
-# function: readMergedJTK
+# Function: readMergedJTK
 # get merged JTK_cycle outs
 # outpath: a folder path containing block1, block2 ...
 # wanted.celltypes: desired celltype
@@ -141,7 +142,7 @@ readMergedJTK<-function(outpath,wanted.celltypes){
   return(JTK_CYCL)
 }
 
-# function: generateAnnotationFile
+# Function: generateAnnotationFile
 # merge cell annotations
 # input: annotated srt *.rds file (TNK.file,B.file,Myeloid.file)
 # output: *.tsv
@@ -151,8 +152,8 @@ readMergedJTK<-function(outpath,wanted.celltypes){
 # caller: NSF
 # dependency: NSF
 # upstream: TypeCluster
-# downstream: NSF
-generateAnnotationFile<-function(TNK.file,B.file,Myeloid.file,cols,new.colnames=NULL){
+# downstream: <seurat>AddMetaData
+generateAnnotationFile<-function(TNK.file,B.file,Myeloid.file,Stem.file,cols,new.colnames=NULL,out.path='../analysis/cell.annotations.tsv'){
   message("reading TNK file")
   TNK=readRDS(TNK.file)
   TNK.meta=TNK@meta.data[,cols]
@@ -165,14 +166,19 @@ generateAnnotationFile<-function(TNK.file,B.file,Myeloid.file,cols,new.colnames=
   Myeloid=readRDS(Myeloid.file)
   Myeloid.meta=Myeloid@meta.data[,cols]
   remove(Myeloid)
-  all.meta=base::Reduce(rbind,x=list(TNK.meta,B.meta,Myeloid.meta))
+  message("reading Stem file")
+  Stem=readRDS(Stem.file)
+  Stem.meta=Stem@meta.data[,cols]
+  remove(Stem)
+  all.meta=base::Reduce(rbind,x=list(TNK.meta,B.meta,Myeloid.meta,Stem.meta))
   if(length(new.colnames)>=1){
     colnames(all.meta)=new.colnames
   }
   all.meta=rownames_to_column(all.meta,var = "cell_id")
-  write_delim(all.meta,'../analysis/cell.annotations.tsv',delim = '\t')
+  write_delim(all.meta,out.path,delim = '\t')
 }
 
+# Function: getWholeDaySplicedData
 # get a day's (6 samples) spliced data from an individual 
 # patient_id: example: TFSH190500A_HZD
 # cells: a vector of cell barcode to include in final data, default is NULL (all cells included)
@@ -180,7 +186,7 @@ generateAnnotationFile<-function(TNK.file,B.file,Myeloid.file,cols,new.colnames=
 ##
 # caller: getMultipleWholeDaySplicedData
 # dependency: subsetLoomMatrix
-# upstream: NSF
+# upstream: <slurm>velocyto.array.slurm
 # downstream: mergeSplicedData (merge matrix of different time points into a single one)
 getWholeDaySplicedData<-function(patient_id,cells=NULL){
   res=list()
@@ -201,6 +207,7 @@ getWholeDaySplicedData<-function(patient_id,cells=NULL){
   return(res)
 }
 
+# Function: getMultipleWholeDaySplicedData
 # get a day's (6 samples) spliced data from multiple individual 
 # individuals: a vector of string indicating different individuals, example: TFSH190500A_HZD
 # output: return a list of loom Matrix
@@ -218,8 +225,14 @@ getMultipleWholeDaySplicedData<-function(individuals){
   return(res)
 }
 
-#mergeAllSamples
-#inputs are .rds
+# Function: mergeAllSamples
+# read RDS of seurat object which annotated at top level
+# inputs are .rds which contained in argument data.path
+##
+# upstream: TypeCluster
+# downstream: dimentionalReductionMergedSrt
+# dependency: getSamplesOneDayToList
+# caller: NSF
 mergeAllSamples<-function(data.path="/lustre/home/acct-medll/medll/data/analysis/"){
   suffix=NULL
   srts=list()
@@ -234,9 +247,17 @@ mergeAllSamples<-function(data.path="/lustre/home/acct-medll/medll/data/analysis
   return(res)
 }
 
-#patient_id: example: TFSH190500A_HZD
-#the files as input are .rds
-#return merged seurat object
+# Function: mergeSamplesOneDay
+# merge samples from a single individual, seldom used, this function was created at the very beginning of this project
+# patient_id: example: TFSH190500A_HZD
+# data.path: the files as input are .rds contained in argument 'data.path'
+##
+# upstream: TypeCluster
+# downstream: plotGeneExpressionByCT
+# dependency: getSamplesOneDayToList
+# caller: NSF
+##
+# return merged seurat object
 mergeSamplesOneDay<-function(patient.id,data.path="/lustre/home/acct-medll/medll/data/analysis/"){
   samples=paste0(patient.id,"_",1:6,".levelTop.rds")
   suffix=paste0("CT",time_point)
@@ -245,9 +266,18 @@ mergeSamplesOneDay<-function(patient.id,data.path="/lustre/home/acct-medll/medll
   return(res)
 }
 
-#merge srt samples from 'patient.id'
-#input: rds
-#return: srt
+# Function: mergeRawSamplesOneDay
+# merge srt samples from 'patient.id', the difference between this function and 'mergeSamplesOneDay' is
+# that this function read from cellranger multi output rather than processed seurat object, it also add module score
+# to each cell and annotate the cell with most-like cell type in column 'type', intermediate seurat object of
+# each sample will be write to path specified by 'write.path'
+# attention doublet will not be removed
+##
+# upstream: cellranger multi
+# downstream: plotGeneExpressionByCT
+# dependency: <seuratWrapper.R>seuratWrap1, <seuratWrapper.R>seuratWrap2, <seuratWrapper.R>seuratWrap3, CT_TIME
+# caller: NSF
+# return merged srt
 mergeRawSamplesOneDay<-function(patient.id,data.path="/lustre/home/acct-medll/medll/data/cellranger_out/",save.each.sample=F,over.write=F,
                                 write.path="/lustre/home/acct-medll/medll/data/analysis/"){
   srts=list()
@@ -330,7 +360,15 @@ TypeCluster<-function(srt,cluster,type,col.name="seurat_clusters",new.meta="type
   return(srt)
 }
 
-#for merged seurat object, perform dimentional reduction, input are from "mergeRawSamplesOneDay/mergeSamplesOneDay"
+# Function: dimentionalReductionMergedSrt
+# a preparation step for integration
+##
+# srt.merged: a merged srt object
+##
+# upstream: mergeMultiplexedSamplesByID, mergeSamplesOneDay
+# downstream: integrateMergedSrt
+# dependency: NSF
+# caller: NSF
 dimentionalReductionMergedSrt<-function(srt.merged){
   srt.merged=JoinLayers(srt.merged)
   srt.merged=NormalizeData(srt.merged)
@@ -338,8 +376,36 @@ dimentionalReductionMergedSrt<-function(srt.merged){
   srt.merged=FindVariableFeatures(srt.merged)
   srt.merged=RunPCA(srt.merged)
   srt.merged=RunUMAP(srt.merged, dims=1:30)
+  return(srt.merged)
 }
 
+# Function: integrateMergedSrt
+# integrate data merged from several srt, should be processed by dimentionalReductionMergedSrt
+##
+# srt.merged.dim: merged and dimentional reductioned srt
+##
+# upstream: dimentionalReductionMergedSrt
+# downstream: TypeCluster
+# dependency: NSF
+# caller: NSF
+integrateMergedSrt<-function(srt.merged.dim){
+  srt.merged.dim[["RNA"]]=split(srt.merged.dim[["RNA"]], f = srt.merged.dim$sample)
+  srt.merged.dim=IntegrateLayers(object=srt.merged.dim, method=CCAIntegration, 
+                                  orig.reduction="pca", new.reduction="integrated.cca",verbose = FALSE)
+  srt.merged.dim[["RNA"]]=JoinLayers(srt.merged.dim[["RNA"]])
+  srt.merged.dim=FindNeighbors(srt.merged.dim, reduction = "integrated.cca", dims = 1:30)
+  srt.merged.dim=FindClusters(srt.merged.dim, resolution = 0.1)
+  srt.merged.dim=RunUMAP(srt.merged.dim, dims = 1:30, reduction = "integrated.cca")
+  return(srt.merged.dim)
+}
+
+# Function: dimentionalReductionSubsetSrt
+# re-perform dimentional reduction to a subseted srt, prepared for re-integration
+##
+# upstream: <Seurat>subset
+# downstream: integrateSubset
+# dependency: NSF
+# caller: NSF
 dimentionalReductionSubsetSrt<-function(srt.sub,res=0.5){
   srt.sub=NormalizeData(srt.sub)
   srt.sub=ScaleData(srt.sub)
@@ -348,10 +414,18 @@ dimentionalReductionSubsetSrt<-function(srt.sub,res=0.5){
   srt.sub=RunUMAP(srt.sub, dims=1:30)
   srt.sub=FindNeighbors(srt.sub,dims =1:30,reduction = "pca")
   srt.sub=FindClusters(srt.sub, resolution = res)
+  return(srt.sub)
 }
 
+# Function: integrateSubset
+# re-integarte data after subsetting
+##
+# upstream: dimentionalReductionSubsetSrt
+# downstream: TypeCluster
+# dependency: NSF
+# caller: NSF
 integrateSubset<-function(subsrt,method=CCAIntegration,classic.normalize=T){
-  subsrt[["RNA"]]=split(subsrt[["RNA"]], f = subsrt$patient)
+  subsrt[["RNA"]]=split(subsrt[["RNA"]], f = subsrt$sample)
   if(classic.normalize){
     subsrt=NormalizeData(subsrt)
     subsrt=FindVariableFeatures(subsrt)
@@ -402,6 +476,34 @@ subsetLoomMatrix<-function(loom.matrix,cell.preffix=NULL,cells=NULL,genes=NULL){
     colnames(loom.matrix$ambiguous)=gsub("^",paste0(cell.preffix,"_"),colnames(loom.matrix$ambiguous))
   }
   return(loom.matrix)
+}
+
+
+# Function: mergeMultiplexedSamplesByID
+# this is a function for merge multiplexed samples in this study
+# file.path: a folder containing multiple rds file to be merged
+# sample.ids: sample IDs like 'X5_250409MIX01'
+##
+# upstream: <Rscript>wrapper.demuxAllSamples.R
+# downstream: dimentionalReductionMergedSrt
+# dependency: NSF
+# caller: NSF
+##
+# speed: about 1 min for 1G rds
+mergeMultiplexedSamplesByID<-function(dir.path,sample.ids){
+  message(date())
+  files=list.files(dir.path) %>% grep(paste(sample.ids,collapse="|"),.,value = T) %>% grep('rds$',.,value=T)
+  all.data=list()
+  i=1
+  for(file in files){
+    this.srt=readRDS(file.path(dir.path,file))
+    this.srt=subset(this.srt,individual!="unknown")
+    all.data[[i]]=this.srt
+    i=i+1
+  }
+  all.data=merge(all.data[[1]],all.data[2:length(all.data)])
+  message(date())
+  return(all.data)
 }
 
 #::::::::::::::::::::::#
@@ -1044,7 +1146,7 @@ plotRhythmicityPvalue<-function(celltypes,p.cutoff=1,features=CIRCADIAN_GENES_MA
    guides(size=guide_legend(title="-log2(p)",override.aes=list(fill="black")),fill=FALSE)
 }
 
-plotPseudobulkByCTByIndividual<-function(srt,cell.type,features,individuals=NULL,normalize.data=F,
+plotPseudobulkByCTByIndividual<-function(srt,cell.type,features,individuals=NULL,normalize.data=F,time.points=CT_TIME_ORDER,
                                          return.data=F,proportion=1,split.by="no",layer="count",relative=T,log=F,plot="raw"){
   data=fetchMergedDataOneCellType(srt,cell.type=cell.type,gene.list=features,CT_field=3,patient_filed = c(1,2),layer=layer,filter_data=F)
   print(head(data))
@@ -1133,33 +1235,33 @@ plotPseudobulkByCTByIndividual<-function(srt,cell.type,features,individuals=NULL
   if(split.by=="individual"){
       ggplot(plotdata)+geom_line(aes(x=time,y=relative_expression,group=feature))+
         geom_point(aes(x=time,y=relative_expression,size=count,color=feature))+
-        scale_x_discrete(limits=CT_TIME_ORDER)+scale_color_manual(values=generateColor(length(features)))+
+        scale_x_discrete(limits=time.points)+scale_color_manual(values=generateColor(length(features)))+
         facet_wrap(~individual,scales="free_y")+guides(size=guide_legend(title="UMI count"))+ggtitle(paste0(cell.type))
   }else{
     if(plot=="raw"){
       ggplot(plotdata)+geom_line(aes(x=time,y=relative_expression,group=individual))+
         geom_point(aes(x=time,y=relative_expression,size=count,color=feature),alpha=0.5)+
-        scale_x_discrete(limits=CT_TIME_ORDER)+scale_color_manual(values=generateColor(length(features)))+
+        scale_x_discrete(limits=time.points)+scale_color_manual(values=generateColor(length(features)))+
         facet_wrap(~feature,scales="free_y")+guides(size=guide_legend(title="UMI count"))+ggtitle(paste0(cell.type))+ylab("z-score")
     }else if(plot=="errorbar"){
       if(log){
         ggplot(plotdata)+geom_line(aes(x=time,y=CT_mean,group=feature))+
           geom_point(aes(x=time,y=CT_mean))+
           geom_errorbar(aes(x=time,ymin=CT_mean-CT_sd,ymax=CT_mean+CT_sd),width=0.2)+
-          scale_x_discrete(limits=CT_TIME_ORDER)+facet_wrap(~feature,scales="free_y")+
+          scale_x_discrete(limits=time.points)+facet_wrap(~feature,scales="free_y")+
           ggtitle(paste0(cell.type))+ylab("z-score")
       }else{
         ggplot(plotdata)+geom_line(aes(x=time,y=CT_median,group=feature))+
           geom_point(aes(x=time,y=CT_median))+
           geom_errorbar(aes(x=time,ymin=CT_q25,ymax=CT_q75),width=0.2)+
-          scale_x_discrete(limits=CT_TIME_ORDER)+facet_wrap(~feature,scales="free_y")+
+          scale_x_discrete(limits=time.points)+facet_wrap(~feature,scales="free_y")+
           ggtitle(paste0(cell.type))+ylab("z-score")
       }
 
     }else if(plot=="box"){
       ggplot(plotdata)+
         geom_boxplot(aes(x=time,y=relative_expression))+
-        scale_x_discrete(limits=CT_TIME_ORDER)+facet_wrap(~feature,scales="free_y")+
+        scale_x_discrete(limits=time.points)+facet_wrap(~feature,scales="free_y")+
         ggtitle(paste0(cell.type))+ylab("z-score")
     }else{
       message("unsupported plot type, supporting: raw/errorbar")
@@ -2215,6 +2317,38 @@ readAllMetaCell<-function(){
   mat_c[is.na(mat_c)]=0
   srt=CreateSeuratObject(mat_c)
   srt=AddMetaData(srt,meta_c)
+  return(srt)
+}
+
+# Function: modAzimuthAnnotation
+# Create predicted.celltype.l1.5 on the basis of predicted.celltype.l2, only work for data annotated with pbmcref
+##
+# upstream: <Azimuth>RunAzimuth
+# downstream: NSF
+# dependency: NSF
+# caller: NSF
+modAzimuthAnnotation<-function(srt){
+  srt$predicted.celltype.l1.5=case_when(srt$predicted.celltype.l2=="ASDC" ~ "ASDC",
+                                        srt$predicted.celltype.l2=="B intermediate" ~ "B memory",
+                                        srt$predicted.celltype.l2=="B memory" ~ "B memory",
+                                        srt$predicted.celltype.l2=="B naive" ~ "B naive",
+                                        srt$predicted.celltype.l2=="CD14 Mono" ~ "CD14 Mono",
+                                        srt$predicted.celltype.l2=="CD16 Mono" ~ "CD16 Mono",
+                                        srt$predicted.celltype.l2 %in% c("CD4 CTL","CD4 Naive","CD4 Proliferating","CD4 TCM","CD4 TEM","Treg") ~ "CD4 T",
+                                        srt$predicted.celltype.l2 %in% c("CD8 Naive","CD8 Proliferating","CD8 TCM","CD8 TEM") ~ "CD8 T",
+                                        srt$predicted.celltype.l2=="cDC1" ~ "cDC1",
+                                        srt$predicted.celltype.l2=="cDC2" ~ "cDC2",
+                                        srt$predicted.celltype.l2=="dnT" ~ "dnT",
+                                        srt$predicted.celltype.l2=="Eryth" ~ "Eryth",
+                                        srt$predicted.celltype.l2=="gdT" ~ "gdT",
+                                        srt$predicted.celltype.l2=="HSPC" ~ "HSPC",
+                                        srt$predicted.celltype.l2=="ILC" ~ "ILC",
+                                        srt$predicted.celltype.l2=="MAIT" ~ "MAIT",
+                                        srt$predicted.celltype.l2 %in% c("NK","NK Proliferating","NK_CD56bright") ~ "NK",
+                                        srt$predicted.celltype.l2=="pDC" ~ "pDC",
+                                        srt$predicted.celltype.l2=="Plasmablast" ~ "Plasma",
+                                        srt$predicted.celltype.l2=="Platelet" ~ "Platelet"
+  )
   return(srt)
 }
 
