@@ -1,8 +1,5 @@
 # Set this option BEFORE installing CRAN packages
-# options(repos = c(
-#   CRAN = "https://cloud.r-project.org",
-#   Bioc = BiocManager::repositories()
-# ))
+# options(repos = c(CRAN = "https://cloud.r-project.org",Bioc = BiocManager::repositories()))
 
 library(Seurat)
 library(SeuratObject)
@@ -152,27 +149,37 @@ readMergedJTK<-function(outpath,wanted.celltypes){
 # caller: NSF
 # dependency: NSF
 # upstream: TypeCluster
-# downstream: <seurat>AddMetaData
-generateAnnotationFile<-function(TNK.file,B.file,Myeloid.file,Stem.file,cols,new.colnames=NULL,out.path='../analysis/cell.annotations.tsv'){
-  message("reading TNK file")
-  TNK=readRDS(TNK.file)
-  TNK.meta=TNK@meta.data[,cols]
-  remove(TNK)
-  message("reading B file")
-  B=readRDS(B.file)
-  B.meta=B@meta.data[,cols]
-  remove(B)
-  message("reading Myeloid file")
-  Myeloid=readRDS(Myeloid.file)
-  Myeloid.meta=Myeloid@meta.data[,cols]
-  remove(Myeloid)
-  message("reading Stem file")
-  Stem=readRDS(Stem.file)
-  Stem.meta=Stem@meta.data[,cols]
-  remove(Stem)
-  all.meta=base::Reduce(rbind,x=list(TNK.meta,B.meta,Myeloid.meta,Stem.meta))
-  if(length(new.colnames)>=1){
-    colnames(all.meta)=new.colnames
+# downstream: <seurat>AddMetaData, <bash>runSeaCells.sh
+generateAnnotationFile<-function(TNK.file=NULL,B.file=NULL,Myeloid.file=NULL,Stem.file=NULL,full.file=NULL,cols,new.colnames=NULL,out.path='../analysis/cell.annotations.tsv'){
+  all.meta=NULL
+  if(!is.null(full.file)){
+    if(is.character(full.file)){
+      full=readRDS(full.file)
+      all.meta=full@meta.data[,cols]
+    }else{
+      all.meta=full.file@meta.data[,cols]
+    }
+  }else{
+    message("reading TNK file")
+    TNK=readRDS(TNK.file)
+    TNK.meta=TNK@meta.data[,cols]
+    remove(TNK)
+    message("reading B file")
+    B=readRDS(B.file)
+    B.meta=B@meta.data[,cols]
+    remove(B)
+    message("reading Myeloid file")
+    Myeloid=readRDS(Myeloid.file)
+    Myeloid.meta=Myeloid@meta.data[,cols]
+    remove(Myeloid)
+    message("reading Stem file")
+    Stem=readRDS(Stem.file)
+    Stem.meta=Stem@meta.data[,cols]
+    remove(Stem)
+    all.meta=base::Reduce(rbind,x=list(TNK.meta,B.meta,Myeloid.meta,Stem.meta))
+    if(length(new.colnames)>=1){
+      colnames(all.meta)=new.colnames
+    }
   }
   all.meta=rownames_to_column(all.meta,var = "cell_id")
   write_delim(all.meta,out.path,delim = '\t')

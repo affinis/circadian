@@ -2489,8 +2489,8 @@ DimPlot(srt.S,label = T,group.by = "manual_NI")
 saveRDS(srt.S,"/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.S.rds")
 
 setwd('/tmpdata/LyuLin/analysis/circadian/R/')
-generateAnnotationFile('7mixed.integrated.TNK.rds','7mixed.integrated.B.rds',
-                       '7mixed.integrated.M.rds','7mixed.integrated.S.rds',
+generateAnnotationFile(TNK.file = '7mixed.integrated.TNK.rds',B.file = '7mixed.integrated.B.rds',
+                       Myeloid.file = '7mixed.integrated.M.rds',Stem.file = '7mixed.integrated.S.rds',
                        cols = c("manual.level1","manual.level2","manual_NI"),
                        out.path = "cell.annotation.7mixed.integrated.tsv")
  
@@ -2523,3 +2523,7 @@ srt$type<-srt$predicted.celltype.l1.5
 DefaultAssay(srt)<-"RNA"
 plotPseudobulkByCTByIndividual(srt,"CD16 Mono","NR1D2",normalize.data = T,
                                time.points = c("CT11","CT15","CT19","CT23","CT27","CT31","CT35"))
+
+# generate cell annotation file for seacell
+generateAnnotationFile(full.file = srt,cols=c("manual.level1","manual.level2","predicted.celltype.l1.5","manual_NI"),
+                       out.path = "/tmpdata/LyuLin/analysis/circadian/R/cell.annotation.clean.sct.Azimuth.tsv")
