@@ -47,6 +47,8 @@ library(topGO)
 library(dorothea)
 # remotes::install_github('chris-mcginnis-ucsf/DoubletFinder', force = TRUE)
 library(DoubletFinder)
+# drc used to analyse ELISA data
+library(drc)
 
 SCRIPTS<-"/tmpdata/LyuLin/script/wrapper_script"
 source(paste(SCRIPTS,"seuratWrapper.R",sep="/"))
@@ -59,7 +61,7 @@ source('/tmpdata/LyuLin/script/circadian/ggplot2_core.R')
 
 setwd('/tmpdata/LyuLin/analysis/circadian/cellranger')
 HOME='/tmpdata/LyuLin/analysis/circadian/cellranger'
-INTERNAL_CONTROL<-c("CDK4")
+#INTERNAL_CONTROL<-c("CDK4")
 INTERNAL_CONTROL<-c("ACTB","GAPDH","B2M","RPLP0","TBP","HPRT1","PPIA")
 time_point<-c(9,13,17,21,1,5)
 time_point_inorder<-c(1,5,9,13,17,21)
@@ -73,7 +75,7 @@ HEALTH<-setdiff(PATIENTS,EMI_PATIENTS)
 VALID_INDIVIDUALS=HEALTH[HEALTH!="TF_ZF"]
 TCR_LOCUS<-c("TRA:v_call","TRA:j_call","TRB:v_call","TRB:d_call","TRB:j_call")
 BCR_LOCUS<-c("IGH:v_call","IGH:d_call","IGH:j_call","IGK:v_call","IGK:j_call","IGL:v_call","IGL:j_call")
-CIRCADIAN_GENES_MAIN<-c("CLOCK","ARNTL","PER1","PER2","PER3","CRY1","CRY2","NR1D1","NR1D2","DBP","TEF","HLF","CIART")
+CIRCADIAN_GENES_MAIN<-c("CLOCK","BMAL1","PER1","PER2","PER3","CRY1","CRY2","NR1D1","NR1D2","DBP","TEF","HLF","CIART")
 
 CIRCADIAN_GENES_PMID_38190520<-c("SERTAD1","ZNF101","PHF21A","STMN3","GNG2","IL1B","IL13RA1",
                          "NR1D1","IRS2","FKBP5","ID3","UBE2B","ZNF438","CLEC4E",
@@ -988,7 +990,7 @@ plotExpressionByCelltype<-function(int.srt,gene.list=CIRCADIAN_GENES_MAIN,colors
     guides(fill=guide_legend(ncol = 1))
 }
 
-#plotMetaByCTByIndividual
+# plotCellProliferationByCTByIndividual
 plotCellProliferationByCTByIndividual<-function(srt,meta.data.col="Proliferation_Score1",return.data=F){
   meta.data=srt@meta.data[,c("patient","CT","manual_NI",meta.data.col)]
   meta.data=meta.data[meta.data$manual_NI=="TNK_proliferatig_MKI67",]
@@ -1151,6 +1153,37 @@ plotRhythmicityPvalue<-function(celltypes,p.cutoff=1,features=CIRCADIAN_GENES_MA
           panel.background=element_rect(fill="white",colour = "black"),
           panel.grid=element_line(color="grey"))+
    guides(size=guide_legend(title="-log2(p)",override.aes=list(fill="black")),fill=FALSE)
+}
+
+plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dist=T){
+  data=fetchMergedDataOneCellType(srt,cell.type=cell.type,gene.list=feature,CT_field=3,patient_filed = c(1,2),layer=layer,filter_data=F)
+  control=srt[["nCount_RNA"]] %>% as.data.frame()
+  control=rownames_to_column(control,var = "observations")
+  colnames(control)[2]="control_expression"
+  print(head(data))
+  print(head(control))
+  data=left_join(data,control)
+  #data$normalized=data$values/data$control_expression
+  data$normalized=1000000*data$values/data$control_expression
+  data=data %>% group_by(time,patient) %>% mutate(mean_expression=mean(log(normalized+1))) %>% group_by(patient) %>%
+    mutate(relative_expression=(mean_expression-mean(mean_expression))/sd(mean_expression))
+  data=data %>% group_by(time) %>% mutate(mean_relative=mean(relative_expression),sd_relative=sd(relative_expression))
+  data=data %>% mutate(relative_q25=quantile(relative_expression,na.rm=T)[2],
+                       relative_q75=quantile(relative_expression,na.rm=T)[4],
+                       relative_median=median(relative_expression))
+  print(head(data))
+  if(norm.dist){
+    ggplot(data)+geom_point(aes(x=time,y=mean_relative))+
+      geom_point(aes(x=time,y=relative_expression))+
+      geom_line(aes(x=time,y=mean_relative,group=features))+
+      geom_errorbar(aes(x=time,ymin=mean_relative-sd_relative,ymax=mean_relative+sd_relative),width=0.2)+
+      ggtitle(paste0(cell.type,": ",feature))
+  }else{
+    ggplot(data)+geom_point(aes(x=time,y=relative_median))+
+      geom_line(aes(x=time,y=relative_median,group=features))+
+      geom_errorbar(aes(x=time,ymin=relative_q25,ymax=relative_q75),width=0.2)+
+      ggtitle(paste0(cell.type,": ",feature))
+  }
 }
 
 plotPseudobulkByCTByIndividual<-function(srt,cell.type,features,individuals=NULL,normalize.data=F,time.points=CT_TIME_ORDER,
@@ -2260,36 +2293,59 @@ FetchExpressedGenesCellType<-function(srt,cell.type,pct.express=0.05,idents="typ
 }
 
 
-#readAllMetaCell
-readAllMetaCell<-function(){
-  samples=PATIENTS %>% lapply(.,paste0,"_",1:6) %>% unlist()
+# Function: readAllMetaCell
+# create seurat object with metacell
+# file.path: a directory containing seacells outputs, each dir relates to a sample
+# std.cellranger.out: if seacells was run under cellranger multi path (like 'SAMPLEID/outs/per_sample_outs/SAMPLEID/count/seacells/'), set it TRUE, else false
+##
+# upstream: <slurm>runSeaCells.slurm
+# downstream: 
+# dependency: NSF
+# caller: NSF
+readAllMetaCell<-function(file.path,std.cellranger.out=T){
+  if(std.cellranger.out){
+    samples=PATIENTS %>% lapply(.,paste0,"_",1:6) %>% unlist()
+  }else{
+    samples=system(paste0('find ',file.path,' -name "*_metacells.csv"'),intern = T)
+  }
   mat_c=NULL
   meta_c=NULL
   for (sample in samples) {
-    prefix=paste0(getField(sample,"_",c(1,2)),"_",CT_TIME[as.numeric(getField(sample,"_",3))])
-    mat.path=paste0("/lustre/home/acct-medll/medll/data/cellranger_out/",sample,
-                    "/outs/per_sample_outs/",sample,"/count/seacells/",prefix,"_metacells.csv")
-    if(!file.exists(mat.path)){
-      next
+    mat=NULL
+    meta.path=NULL
+    if(std.cellranger.out){
+      prefix=paste0(getField(sample,"_",c(1,2)),"_",CT_TIME[as.numeric(getField(sample,"_",3))])
+      mat.path=paste0(file.path,sample,"/outs/per_sample_outs/",sample,"/count/seacells/",prefix,"_metacells.csv")
+      if(!file.exists(mat.path)){
+        next
+      }
+      mat=read.csv(mat.path)
+    }else{
+      prefix=paste0("TF_",getField(basename(sample),"_",c(1,2)))
+      mat=read.csv(sample)
     }
-    mat=read.csv(mat.path)
+    
     colnames(mat)=gsub(".","-",colnames(mat),fixed = T)
     colnames(mat)[-1]=paste0(prefix,"_",colnames(mat)[-1])
-    print(head(mat[1:3,1:3]))
+    print(head(mat[1:5,1:5]))
     
-    meta.path=paste0("/lustre/home/acct-medll/medll/data/cellranger_out/",sample,
-                     "/outs/per_sample_outs/",sample,"/count/seacells/",prefix,"_metadata.csv")
+    if(std.cellranger.out){
+      meta.path=paste0(file.path,sample,"/outs/per_sample_outs/",sample,"/count/seacells/",prefix,"_metadata.csv")
+    }else{
+      meta.path=gsub("metacells","metadata",sample)
+    }
+
     meta=read.csv(meta.path)
     rownames(meta)=meta$index
     meta$index=NULL
-    print(head(meta[1:3,1:3]))
+    print(head(meta[1:5,1:5]))
     
-    meta.suma=meta[c("predicted.celltype.l1.5","SEACell")] %>% table() %>% as.data.frame()
-    meta.suma=dplyr::filter(meta.suma,predicted.celltype.l1.5!="")
+    meta.suma=meta[c("predicted.celltype.l2","SEACell")] %>% table() %>% as.data.frame()
+    meta.suma=dplyr::filter(meta.suma,predicted.celltype.l2!="")
     meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(meta.cell.size=sum(Freq))
-    meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(predicted.celltype.l1.5.purity=Freq/meta.cell.size)
-    meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(predicted.celltype.l1.5.main=predicted.celltype.l1.5[which.max(Freq)])
-    meta.suma=dplyr::filter(meta.suma,predicted.celltype.l1.5==predicted.celltype.l1.5.main)[c("SEACell","meta.cell.size","predicted.celltype.l1.5.purity","predicted.celltype.l1.5.main")]
+    meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(predicted.celltype.l2.purity=Freq/meta.cell.size)
+    meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(predicted.celltype.l2.main=predicted.celltype.l2[which.max(Freq)])
+    meta.suma=dplyr::filter(meta.suma,predicted.celltype.l2==predicted.celltype.l2.main)[c("SEACell","meta.cell.size","predicted.celltype.l2.purity","predicted.celltype.l2.main")]
     
     meta.suma.NI=meta[c("manual_NI","SEACell")] %>% table() %>% as.data.frame()
     meta.suma.NI=dplyr::filter(meta.suma.NI,manual_NI!="")
@@ -2324,8 +2380,13 @@ readAllMetaCell<-function(){
   mat_c[is.na(mat_c)]=0
   srt=CreateSeuratObject(mat_c)
   srt=AddMetaData(srt,meta_c)
+  srt$type=srt$predicted.celltype.l2.main
+  srt$CT=getField(rownames(srt@meta.data),sep = "_",3)
+  srt$individual=getField(rownames(srt@meta.data),sep = "_",2)
+  srt=AddMetaData(srt,metadata=colSums(LayerData(srt)),col.name = "nCount_RNA")
   return(srt)
 }
+
 
 # Function: modAzimuthAnnotation
 # Create predicted.celltype.l1.5 on the basis of predicted.celltype.l2, only work for data annotated with pbmcref

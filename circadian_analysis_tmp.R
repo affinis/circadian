@@ -2525,5 +2525,107 @@ plotPseudobulkByCTByIndividual(srt,"CD16 Mono","NR1D2",normalize.data = T,
                                time.points = c("CT11","CT15","CT19","CT23","CT27","CT31","CT35"))
 
 # generate cell annotation file for seacell
-generateAnnotationFile(full.file = srt,cols=c("manual.level1","manual.level2","predicted.celltype.l1.5","manual_NI"),
+generateAnnotationFile(full.file = srt,cols=c("manual.level1","manual.level2","predicted.celltype.l2","manual_NI"),
                        out.path = "/tmpdata/LyuLin/analysis/circadian/R/cell.annotation.clean.sct.Azimuth.tsv")
+
+# read metacell 
+srt.metacell<-readAllMetaCell('/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell/',std.cellranger.out = F)
+#srt.metacell$sample<-case_when(paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT15","ZYRCT15","JJCCT19","LYHCT15") ~ "X5_250409MIX01",
+#                      paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT35","ZYRCT27","JJCCT15","LYHCT27") ~ "X5_250424MIX02",
+#                      paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT23","ZYRCT23","JJCCT35","LYHCT31") ~ "X5_250424MIX03",
+#                      paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT31","ZYRCT11","JJCCT31","LYHCT23") ~ "X5_250424MIX04",
+#                      paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT27","ZYRCT31","JJCCT23","LYHCT11") ~ "X5_250424MIX05",
+#                      paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT11","ZYRCT35","JJCCT27","LYHCT35") ~ "X5_250424MIX06",
+#                      paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT19","ZYRCT19","JJCCT11","LYHCT19") ~ "X5_250424MIX07")
+srt.metacell$sample<-paste0(srt.metacell$individual,"_",srt.metacell$CT)
+srt.metacell<-subset(srt.metacell,predicted.celltype.l2.purity>=0.90)
+srt.metacell<-integrateSubset(srt.metacell)
+DimPlot(srt.metacell,group.by = "type")
+plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "CLOCK",norm.dist = T,split = T)
+
+plotPseudobulkByCTByIndividual(srt.metacell,"CD14 Mono","PER2",
+                               time.points = c("CT11","CT15","CT19","CT23","CT27","CT31","CT35"),
+                               normalize.data = T,plot = "errorbar",proportion = 0.05)
+
+#use drc package to analyse ELISA data
+## melatonin data
+std_data <- data.frame(
+  #Concentration = c(1000, 500, 250, 125, 62.5, 31.25, 15.63),  # Standard concentrations
+  #OD = c(0.701, 1.078, 1.450, 1.735, 1.964, 2.200, 2.694)      # Corresponding OD values
+  Concentration = c(1000, 500, 250, 125, 62.5, 31.25, 15.63, 0),
+  OD = c(0.738, 1.151, 1.686, 2.411, 2.968, 3.101, 3.264, 3.259) 
+)
+fit <- drm(OD ~ Concentration, data = std_data, fct = LL.4())
+summary(fit)
+
+all_melatonin_data<-NULL
+# Example unknown ODs
+unknown_ODs<-c(1.372, 1.295, 1.133, 1.208, 1.316, 1.338, 1.300) # KD
+unknown_ODs<-c(1.333, 1.219, 1.405, 1.335, 1.329, 1.382, 1.354) # WMY
+unknown_ODs<-c(1.255, 1.149, 1.270, 1.092, 1.228, 1.297, 1.221) # ZYR
+unknown_ODs1<-c(2.354, 2.138, 2.112, 2.107, 2.116, 2.224, 2.161) # LYH1
+unknown_ODs2<-c(2.482, 2.375, 2.431, 2.141, 2.404, 2.185, 2.088) # LYH2
+unknown_ODs<-(unknown_ODs1+unknown_ODs2)/2
+unknown_ODs1<-c(2.077, 2.207, 1.795, 1.979, 2.067, 2.589, 2.313) # JJC1
+unknown_ODs2<-c(2.583, 1.989, 2.027, 2.239, 2.097, 1.963, 2.234) # JJC2
+unknown_ODs<-(unknown_ODs1+unknown_ODs2)/2
+# Predict concentrations (inverse prediction)
+unknown_conc <- ED(fit, unknown_ODs, type = "absolute", display = FALSE)
+unknown_conc<-as.data.frame(unknown_conc)
+unknown_conc$CT<-c("CT11","CT15","CT19","CT23","CT27","CT31","CT35")
+unknown_conc$individual<-"KD"
+unknown_conc$individual<-"WMY"
+unknown_conc$individual<-"ZYR"
+unknown_conc$individual<-"LYH"
+unknown_conc$individual<-"JJC"
+if(is.null(all_melatonin_data)){
+  all_melatonin_data=unknown_conc
+}else{
+  all_melatonin_data=rbind(all_melatonin_data,unknown_conc)
+}
+ggplot(all_melatonin_data)+geom_point(aes(x=CT,y=Estimate))+
+  geom_line(aes(x=CT,y=Estimate,group=individual,color=individual))+
+  facet_wrap(~individual,scale="free_y")+
+  ggtitle("melatonin of individuals")+theme(axis.text.x = element_text(angle=60,hjust=1))
+all_melatonin_data<-all_melatonin_data %>% group_by(individual) %>% mutate(relative_concentration=(Estimate-mean(Estimate))/sd(Estimate))
+ggplot(all_melatonin_data)+geom_boxplot(aes(x=CT,y=relative_concentration))+
+  geom_point(aes(x=CT,y=relative_concentration))+ylab("z-score")+
+  ggtitle("z-score of melatonin")+theme(axis.text.x = element_text(angle=60,hjust=1))
+saveRDS(all_melatonin_data,"ELISA_melatonin.rds")
+## cortisol data
+std_data <- data.frame(
+  Concentration = c(400, 200, 100, 50, 25, 12.5, 6.25, 0),  # Standard concentrations
+  OD = c(0.079, 0.094, 0.107, 0.239, 0.368, 0.574, 0.736, 0.782)      # Corresponding OD values
+)
+fit <- drm(OD ~ Concentration, data = std_data, fct = LL.4())
+summary(fit)
+
+all_cortisol_data<-NULL
+unknown_ODs<-c(0.198, 0.229, 0.317, 0.357, 0.284, 0.302, 0.272) # KD
+unknown_ODs<-c(0.157, 0.253, 0.258, 0.227, 0.231, 0.204, 0.196) # WMY
+unknown_ODs<-c(0.200, 0.199, 0.214, 0.269, 0.183, 0.188, 0.278) # ZYR
+unknown_ODs<-c(0.440, 0.400, 0.531, 0.675, 0.351, 0.428, 0.344) # LYH
+unknown_ODs<-c(0.088, 0.097, 0.132, 0.105, 0.130, 0.084, 0.087) # JJC
+
+unknown_conc <- ED(fit, unknown_ODs, type = "absolute", display = FALSE)
+unknown_conc<-as.data.frame(unknown_conc)
+unknown_conc$CT<-c("CT11","CT15","CT19","CT23","CT27","CT31","CT35")
+unknown_conc$individual<-"KD"
+unknown_conc$individual<-"WMY"
+unknown_conc$individual<-"ZYR"
+unknown_conc$individual<-"LYH"
+unknown_conc$individual<-"JJC"
+if(is.null(all_cortisol_data)){
+  all_cortisol_data=unknown_conc
+}else{
+  all_cortisol_data=rbind(all_cortisol_data,unknown_conc)
+}
+ggplot(all_cortisol_data)+geom_point(aes(x=CT,y=Estimate))+
+  geom_line(aes(x=CT,y=Estimate,group=individual,color=individual))+
+  facet_wrap(~individual,scale="free_y")+
+  ggtitle("cortisol of individuals")+theme(axis.text.x = element_text(angle=60,hjust=1))
+all_cortisol_data<-all_cortisol_data %>% group_by(individual) %>% mutate(relative_concentration=(Estimate-mean(Estimate))/sd(Estimate))
+ggplot(all_cortisol_data)+geom_boxplot(aes(x=CT,y=relative_concentration))+
+  geom_point(aes(x=CT,y=relative_concentration))+ylab("z-score")+
+  ggtitle("z-score of cortisol")+theme(axis.text.x = element_text(angle=60,hjust=1))
+saveRDS(all_cortisol_data,"ELISA_cortisol.rds")
