@@ -107,15 +107,150 @@ TNK_markers_ZhangZeMing<-c("CCR7","LEF1","SELL","TCF7","CD27","CD28","S1PR1", #C
                            "SLC4A10","KLRB1","ZBTB16","NCRЗ","RORC","RORA" #MAIT
                            )
 
-celltypes<-c("ASDC","B memory","B naive","CD14 Mono","CD16 Mono","CD4 T","CD8 T","cDC1","cDC2","dnT","Eryth","gdT","HSPC","ILC","MAIT","NK","pDC","Plasma","Platelet")
+celltypes<-c("B naive"="B","B memory"="B","Plasmablast"="B","B intermediate"="B",
+             "CD14 Mono"="Myeloid","CD16 Mono"="Myeloid","ASDC"="Myeloid","cDC1"="Myeloid","cDC2"="Myeloid","pDC"="Myeloid",
+             "CD4 Naive"="T","CD4 CTL"="T","CD4 Proliferating"="T","CD4 TCM"="T","CD4 TEM"="T",
+             "CD8 Naive"="T","CD8 TCM"="T","CD8 TEM"="T","dnT"="T","gdT"="T","ILC"="T","MAIT"="T",
+             "NK"="NK","NK_CD56ᵇʳⁱᵍʰᵗ"="NK","NK Proliferating"="NK",
+             "HSPC"="HSPC")
 celltypes_NI<-c("B_naive","CD14⁺Monocytes","CD16⁺Monocytes","CD4_naive_CCR7","CD4_TCM_AQP3",
                 "CD4_TEM_ANXA1","CD4_TEM_GNLY","CD4_TEM_GZMK","CD4_Treg_FOXP3","CD8_MAIT_SLC4A10",
                 "CD8_naive_LEF1","CD8_TEM_CMC1","CD8_TEM_GNLY","CD8_TEM_ZNF683","dnT_LYST",
                 "HSC_CD34","mDC","NK_CD56ᵇʳⁱᵍʰᵗ","NK_CD56ᵈⁱᵐ","pDC","Plasma cell","TNK_proliferatig_MKI67","γδT")
 
+BATCH<-c("JJC-CT11"="X5_250424MIX07","JJC-CT15"="X5_250424MIX02","JJC-CT19"="X5_250409MIX01","JJC-CT23"="X5_250424MIX05","JJC-CT27"="X5_250424MIX06","JJC-CT31"="X5_250424MIX04","JJC-CT35"="X5_250424MIX03",
+         "LYH-CT11"="X5_250424MIX05","LYH-CT15"="X5_250409MIX01","LYH-CT19"="X5_250424MIX07","LYH-CT23"="X5_250424MIX04","LYH-CT27"="X5_250424MIX02","LYH-CT31"="X5_250424MIX03","LYH-CT35"="X5_250424MIX06",
+         "KD-CT11"="X5_250424MIX06","KD-CT15"="X5_250409MIX01","KD-CT19"="X5_250424MIX07","KD-CT23"="X5_250424MIX03","KD-CT27"="X5_250424MIX05","KD-CT31"="X5_250424MIX04","KD-CT35"="X5_250424MIX02",
+         "ZYR-CT11"="X5_250424MIX04","ZYR-CT15"="X5_250409MIX01","ZYR-CT19"="X5_250424MIX07","ZYR-CT23"="X5_250424MIX03","ZYR-CT27"="X5_250424MIX02","ZYR-CT31"="X5_250424MIX05","ZYR-CT35"="X5_250424MIX06")
+
 #::::::::: ::::#
 # I/O FUNCTIONS
 #:::::::::: :::#
+
+# Function: readAllMetaCell
+# create seurat object with metacell
+# file.path: a directory containing seacells outputs, each dir relates to a sample
+# std.cellranger.out: if seacells was run under cellranger multi path (like 'SAMPLEID/outs/per_sample_outs/SAMPLEID/count/seacells/'), set it TRUE, else false
+##
+# upstream: <slurm>runSeaCells.slurm
+# downstream: <Rscript>wrapper.testRhythmicity.R
+# dependency: NSF
+# caller: NSF
+readAllMetaCell<-function(file.path,std.cellranger.out=T){
+  if(std.cellranger.out){
+    samples=PATIENTS %>% lapply(.,paste0,"_",1:6) %>% unlist()
+  }else{
+    samples=system(paste0('find ',file.path,' -name "*_metacells.csv"'),intern = T)
+  }
+  mat_c=NULL
+  meta_c=NULL
+  for (sample in samples) {
+    mat=NULL
+    meta.path=NULL
+    if(std.cellranger.out){
+      prefix=paste0(getField(sample,"_",c(1,2)),"_",CT_TIME[as.numeric(getField(sample,"_",3))])
+      mat.path=paste0(file.path,sample,"/outs/per_sample_outs/",sample,"/count/seacells/",prefix,"_metacells.csv")
+      if(!file.exists(mat.path)){
+        next
+      }
+      mat=read.csv(mat.path)
+    }else{
+      prefix=paste0("TF_",getField(basename(sample),"_",c(1,2)))
+      mat=read.csv(sample)
+    }
+    
+    colnames(mat)=gsub(".","-",colnames(mat),fixed = T)
+    colnames(mat)[-1]=paste0(prefix,"_",colnames(mat)[-1])
+    #print(head(mat[1:5,1:5]))
+    
+    if(std.cellranger.out){
+      meta.path=paste0(file.path,sample,"/outs/per_sample_outs/",sample,"/count/seacells/",prefix,"_metadata.csv")
+    }else{
+      meta.path=gsub("metacells","metadata",sample)
+    }
+    
+    meta=read.csv(meta.path)
+    rownames(meta)=meta$index
+    meta$index=NULL
+    #print(head(meta[1:5,1:5]))
+    
+    meta.suma=meta[c("predicted.celltype.l2","SEACell")] %>% table() %>% as.data.frame()
+    meta.suma=dplyr::filter(meta.suma,predicted.celltype.l2!="")
+    meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(meta.cell.size=sum(Freq))
+    meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(predicted.celltype.l2.purity=Freq/meta.cell.size)
+    meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(predicted.celltype.l2.main=predicted.celltype.l2[which.max(Freq)])
+    meta.suma=dplyr::filter(meta.suma,predicted.celltype.l2==predicted.celltype.l2.main)[c("SEACell","meta.cell.size","predicted.celltype.l2.purity","predicted.celltype.l2.main")]
+    
+    meta.suma.NI=meta[c("manual_NI","SEACell")] %>% table() %>% as.data.frame()
+    meta.suma.NI=dplyr::filter(meta.suma.NI,manual_NI!="")
+    meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(meta.cell.size=sum(Freq))
+    meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(manual_NI.purity=Freq/meta.cell.size)
+    meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(manual_NI.main=manual_NI[which.max(Freq)])
+    meta.suma.NI=dplyr::filter(meta.suma.NI,manual_NI==manual_NI.main)[c("SEACell","manual_NI.purity","manual_NI.main")]
+    
+    meta.suma=left_join(meta.suma,meta.suma.NI,by="SEACell") %>% as.data.frame()
+    rownames(meta.suma)=meta.suma$SEACell
+    meta.suma$SEACell=NULL
+    #print(head(meta.suma[1:3,]))
+    
+    if(is.null(mat_c)){
+      mat_c=mat
+    }else{
+      mat_c=left_join(mat_c,mat)
+    }
+    
+    if(is.null(meta_c)){
+      meta_c=meta.suma
+    }else{
+      meta_c=rbind(meta_c,meta.suma)
+    }
+    #srt=CreateSeuratObject(counts=mat)
+    #srt=AddMetaData(srt,meta.suma)
+    #return(srt)
+  }
+  mat_c=as.data.frame(mat_c)
+  rownames(mat_c)=mat_c$X
+  mat_c$X=NULL
+  mat_c[is.na(mat_c)]=0
+  print(mat_c[1:3,1:3])
+  srt=CreateSeuratObject(mat_c)
+  if(!std.cellranger.out){
+    rownames(meta_c)=gsub("filtered_bc_matrix_","",rownames(meta_c)) %>% gsub("^","TF_",.)
+  }
+  print(meta_c[1:3,1:3])
+  srt=AddMetaData(srt,meta_c)
+  srt$type=srt$predicted.celltype.l2.main
+  srt$CT=getField(rownames(srt@meta.data),sep = "_",3)
+  srt$individual=getField(rownames(srt@meta.data),sep = "_",2)
+  srt=AddMetaData(srt,metadata=colSums(LayerData(srt)),col.name = "nCount_RNA")
+  return(srt)
+}
+
+# Function: readJTKFromMetaCells
+# get all meta cell JTK result by individual
+# caller: NSF
+# dependency: getField
+# upstream: wrapper.testRhythmicity.R
+# downstream: 
+readJTKFromMetaCells<-function(path){
+  filesJTK=list.files(path,pattern = "JTKresult_*")
+  res=NULL
+  for(file in filesJTK){
+    this.individual=getField(file,"_",2)
+    this.celltype=getField(file,"_",-c(1,2)) %>% gsub(".txt","",.,fixed = T) %>% gsub("_"," ",.)
+    message(paste0("reading data from individual: ",this.individual,", celltype: ",this.celltype))
+    this.res=read.delim(file.path(path,file),header = T)
+    this.res$individual=this.individual
+    this.res$celltype=this.celltype
+    if(is.null(res)){
+      res=this.res
+    }else{
+      res=rbind(res,this.res)
+    }
+  }
+  print(head(res))
+  return(res)
+}
 
 # Function: readMergedJTK
 # get merged JTK_cycle outs
@@ -433,7 +568,7 @@ dimentionalReductionSubsetSrt<-function(srt.sub,res=0.5){
 # downstream: TypeCluster
 # dependency: NSF
 # caller: NSF
-integrateSubset<-function(subsrt,method=CCAIntegration,classic.normalize=T){
+integrateSubset<-function(subsrt,method=CCAIntegration,classic.normalize=T,k.weight=100){
   subsrt[["RNA"]]=split(subsrt[["RNA"]], f = subsrt$sample)
   if(classic.normalize){
     subsrt=NormalizeData(subsrt)
@@ -444,10 +579,10 @@ integrateSubset<-function(subsrt,method=CCAIntegration,classic.normalize=T){
   }
   subsrt=RunPCA(subsrt)
   if(classic.normalize){
-    subsrt=IntegrateLayers(object=subsrt, method=method, orig.reduction="pca", new.reduction="integrated.cca",verbose = FALSE)
+    subsrt=IntegrateLayers(object=subsrt, method=method, orig.reduction="pca", new.reduction="integrated.cca",verbose = FALSE,k.weight=k.weight)
     subsrt[["RNA"]]=JoinLayers(subsrt[["RNA"]])
   }else{
-    subsrt=IntegrateLayers(object=subsrt, method=method, orig.reduction="pca", normalization.method = "SCT",
+    subsrt=IntegrateLayers(object=subsrt, method=method, orig.reduction="pca", normalization.method = "SCT",k.weight=k.weight,
                            new.reduction="integrated.cca",verbose = FALSE)
     subsrt[["RNA"]]=JoinLayers(subsrt[["RNA"]])
   }
@@ -1172,18 +1307,28 @@ plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dis
                        relative_q75=quantile(relative_expression,na.rm=T)[4],
                        relative_median=median(relative_expression))
   print(head(data))
-  if(norm.dist){
-    ggplot(data)+geom_point(aes(x=time,y=mean_relative))+
-      geom_point(aes(x=time,y=relative_expression))+
-      geom_line(aes(x=time,y=mean_relative,group=features))+
-      geom_errorbar(aes(x=time,ymin=mean_relative-sd_relative,ymax=mean_relative+sd_relative),width=0.2)+
+  if(layer=="data"){
+    ggplot(data)+geom_boxplot(aes(x=time,y=values))+
+      geom_jitter(aes(x=time,y=values))+facet_wrap(~patient,scale="free_y")+
       ggtitle(paste0(cell.type,": ",feature))
   }else{
-    ggplot(data)+geom_point(aes(x=time,y=relative_median))+
-      geom_line(aes(x=time,y=relative_median,group=features))+
-      geom_errorbar(aes(x=time,ymin=relative_q25,ymax=relative_q75),width=0.2)+
+    ggplot(data)+geom_boxplot(aes(x=time,y=normalized))+
+      geom_jitter(aes(x=time,y=normalized))+facet_wrap(~patient,scale="free_y")+
       ggtitle(paste0(cell.type,": ",feature))
   }
+
+  #if(norm.dist){
+  #  ggplot(data)+geom_point(aes(x=time,y=mean_relative))+
+  #    geom_point(aes(x=time,y=relative_expression))+
+  #    geom_line(aes(x=time,y=mean_relative,group=features))+
+  #    geom_errorbar(aes(x=time,ymin=mean_relative-sd_relative,ymax=mean_relative+sd_relative),width=0.2)+
+  #    ggtitle(paste0(cell.type,": ",feature))
+  #}else{
+  #  ggplot(data)+geom_point(aes(x=time,y=relative_median))+
+  #    geom_line(aes(x=time,y=relative_median,group=features))+
+  #    geom_errorbar(aes(x=time,ymin=relative_q25,ymax=relative_q75),width=0.2)+
+  #    ggtitle(paste0(cell.type,": ",feature))
+  #}
 }
 
 plotPseudobulkByCTByIndividual<-function(srt,cell.type,features,individuals=NULL,normalize.data=F,time.points=CT_TIME_ORDER,
@@ -2105,14 +2250,17 @@ cateSub<-function(vector,categories.ori,categories.nov){
   return(vector)
 }
 
-srt2bulkMatrix<-function(srt,split.by){
+srt2bulkMatrix<-function(srt,split.by,layer="count",normalize=F){
   res=NULL
   if(length(split.by)==1){
     reps=srt[[split.by]] %>% unique() %>% unlist() %>% as.vector()
     for(rep in reps){
       this.cells=rownames(srt@meta.data[srt@meta.data[split.by]==rep,])
-      df=LayerData(srt,cells=this.cells,layer="count")%>% rowSums() %>% as.data.frame()
+      df=LayerData(srt,cells=this.cells,layer=layer)%>% rowSums() %>% as.data.frame()
       colnames(df)=rep
+      if(normalize){
+        df[,rep]=df[,rep]*1000000/sum(df[,rep])
+      }
       message(colnames(df))
       df=rownames_to_column(df,var = "genes")
       if(is.null(res)){
@@ -2128,8 +2276,12 @@ srt2bulkMatrix<-function(srt,split.by){
     for(rep1 in reps1){
       for(rep2 in reps2){
         this.cells=rownames(srt@meta.data[srt@meta.data[split.by[1]]==rep1&srt@meta.data[split.by[2]]==rep2,])
-        df=LayerData(srt,cells=this.cells,layer="count")%>% rowSums() %>% as.data.frame()
-        colnames(df)=paste0(rep1,"-",rep2) %>% gsub(" ","_",.)
+        df=LayerData(srt,cells=this.cells,layer=layer)%>% rowSums() %>% as.data.frame()
+        new_colname=paste0(rep1,"-",rep2) %>% gsub(" ","_",.)
+        colnames(df)=new_colname
+        if(normalize){
+          df[,new_colname]=df[,new_colname]*1000000/sum(df[,new_colname])
+        }
         message(colnames(df))
         df=rownames_to_column(df,var = "genes")
         if(is.null(res)){
@@ -2148,8 +2300,12 @@ srt2bulkMatrix<-function(srt,split.by){
       for(rep2 in reps2){
         for(rep3 in reps3){
           this.cells=rownames(srt@meta.data[srt@meta.data[split.by[1]]==rep1&srt@meta.data[split.by[2]]==rep2&srt@meta.data[split.by[3]]==rep3,])
-          df=LayerData(srt,cells=this.cells,layer="count")%>% rowSums() %>% as.data.frame()
-          colnames(df)=paste0(rep1,"-",rep2,"-",rep3) %>% gsub(" ","_",.)
+          df=LayerData(srt,cells=this.cells,layer=layer)%>% rowSums() %>% as.data.frame()
+          new_colname=paste0(rep1,"-",rep2,"-",rep3) %>% gsub(" ","_",.)
+          colnames(df)=new_colname
+          if(normalize){
+            df[,new_colname]=df[,new_colname]*1000000/sum(df[,new_colname])
+          }
           message(colnames(df))
           df=rownames_to_column(df,var = "genes")
           if(is.null(res)){
@@ -2267,6 +2423,67 @@ plotRadarCellType<-function(srt,celltypes,feature,colors=generateColor(25)){
   #  theme_classic()
 }
 
+# Function: plotCountOscilattingByMetaCelltype
+# plot bar plot showing count of circadian genes for each cell type
+##
+# upstream: readJTKFromMetaCells
+# downstream: NSF
+# dependency: NSF
+# caller: NSF
+plotCountOscilattingByMetaCelltype<-function(JTK.result,threshold.ADJ.P=0.05,PER.floor=20,PER.ceiling=28){
+  AllJTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
+  #filter for genes oscillate in at least 2 people
+  filtered.genes=AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
+  filtered.genes=filtered.genes$CycID %>% unique()
+  AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
+  plotdata=(AllJTKresult.filtered[c("CycID","celltype")] %>% unique())$celltype %>% table() %>% as.data.frame()
+  colnames(plotdata)[1]="cell_type"
+  plotdata$main_type=celltypes[as.vector(plotdata$cell_type)] %>% as.character()
+  print(head(plotdata))
+  ggplot(plotdata)+geom_bar(aes(x=cell_type,y=Freq,fill=main_type),stat="identity",color="black")+
+    scale_y_continuous(expand = c(0,0),limits = c(0,max(plotdata$Freq)+100))+scale_x_discrete(limits=names(celltypes))+
+    theme(axis.text.x = element_text(angle=60,hjust=1),panel.background = element_rect(fill="white",color="black"),
+          panel.grid = element_line(color="grey"))+
+    scale_fill_manual(values = generateColor(n = length(unique(plotdata$main_type))))+
+    ylab("# of oscillating genes")+ xlab("")+NoLegend()
+}
+
+# Function: plotCountOscilattingByMetaCelltypeByCT
+# plot bar plot showing count of circadian genes at each CT that reaching peaks for each cell type
+##
+# upstream: readJTKFromMetaCells
+# downstream: NSF
+# dependency: NSF
+# caller: NSF
+plotCountOscilattingByMetaCelltypeByCT<-function(JTK.result,threshold.ADJ.P=0.05,PER.floor=20,PER.ceiling=28){
+  AllJTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
+  #filter for genes oscillate in at least 2 people
+  filtered.genes=AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
+  filtered.genes=filtered.genes$CycID %>% unique()
+  AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
+  plotdata=AllJTKresult.filtered[c("celltype","LAG","individual")] %>% table() %>% as.data.frame()
+  print(head(plotdata))
+  ggplot(plotdata)+geom_bar(aes(x=LAG,y=Freq,fill=celltype),stat="identity")+
+    facet_wrap(~individual+celltype,scale="free_y")
+}
+
+# Function: plotEnrichGObyCT
+#
+##
+# upstream: readJTKFromMetaCells
+# downstream: NSF
+# dependency: NSF
+# caller: NSF
+#plotEnrichGObyCT<-function(JTK.result,threshold.ADJ.P=0.05,PER.floor=20,PER.ceiling=28){
+#  AllJTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
+#  #filter for genes oscillate in at least 2 people
+#  filtered.genes=AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
+#  filtered.genes=filtered.genes$CycID %>% unique()
+#  AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
+#  print(head(AllJTKresult.filtered))
+#  for(lag in )
+#}
+
 #enrichGObyHGNC
 #change HGNC gene symbols to ENTREZ ID and then query for GO terms
 enrichGObyHGNC<-function(genes,backgroud.genes){
@@ -2292,100 +2509,6 @@ FetchExpressedGenesCellType<-function(srt,cell.type,pct.express=0.05,idents="typ
   return(expressed_genes)
 }
 
-
-# Function: readAllMetaCell
-# create seurat object with metacell
-# file.path: a directory containing seacells outputs, each dir relates to a sample
-# std.cellranger.out: if seacells was run under cellranger multi path (like 'SAMPLEID/outs/per_sample_outs/SAMPLEID/count/seacells/'), set it TRUE, else false
-##
-# upstream: <slurm>runSeaCells.slurm
-# downstream: 
-# dependency: NSF
-# caller: NSF
-readAllMetaCell<-function(file.path,std.cellranger.out=T){
-  if(std.cellranger.out){
-    samples=PATIENTS %>% lapply(.,paste0,"_",1:6) %>% unlist()
-  }else{
-    samples=system(paste0('find ',file.path,' -name "*_metacells.csv"'),intern = T)
-  }
-  mat_c=NULL
-  meta_c=NULL
-  for (sample in samples) {
-    mat=NULL
-    meta.path=NULL
-    if(std.cellranger.out){
-      prefix=paste0(getField(sample,"_",c(1,2)),"_",CT_TIME[as.numeric(getField(sample,"_",3))])
-      mat.path=paste0(file.path,sample,"/outs/per_sample_outs/",sample,"/count/seacells/",prefix,"_metacells.csv")
-      if(!file.exists(mat.path)){
-        next
-      }
-      mat=read.csv(mat.path)
-    }else{
-      prefix=paste0("TF_",getField(basename(sample),"_",c(1,2)))
-      mat=read.csv(sample)
-    }
-    
-    colnames(mat)=gsub(".","-",colnames(mat),fixed = T)
-    colnames(mat)[-1]=paste0(prefix,"_",colnames(mat)[-1])
-    print(head(mat[1:5,1:5]))
-    
-    if(std.cellranger.out){
-      meta.path=paste0(file.path,sample,"/outs/per_sample_outs/",sample,"/count/seacells/",prefix,"_metadata.csv")
-    }else{
-      meta.path=gsub("metacells","metadata",sample)
-    }
-
-    meta=read.csv(meta.path)
-    rownames(meta)=meta$index
-    meta$index=NULL
-    print(head(meta[1:5,1:5]))
-    
-    meta.suma=meta[c("predicted.celltype.l2","SEACell")] %>% table() %>% as.data.frame()
-    meta.suma=dplyr::filter(meta.suma,predicted.celltype.l2!="")
-    meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(meta.cell.size=sum(Freq))
-    meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(predicted.celltype.l2.purity=Freq/meta.cell.size)
-    meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(predicted.celltype.l2.main=predicted.celltype.l2[which.max(Freq)])
-    meta.suma=dplyr::filter(meta.suma,predicted.celltype.l2==predicted.celltype.l2.main)[c("SEACell","meta.cell.size","predicted.celltype.l2.purity","predicted.celltype.l2.main")]
-    
-    meta.suma.NI=meta[c("manual_NI","SEACell")] %>% table() %>% as.data.frame()
-    meta.suma.NI=dplyr::filter(meta.suma.NI,manual_NI!="")
-    meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(meta.cell.size=sum(Freq))
-    meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(manual_NI.purity=Freq/meta.cell.size)
-    meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(manual_NI.main=manual_NI[which.max(Freq)])
-    meta.suma.NI=dplyr::filter(meta.suma.NI,manual_NI==manual_NI.main)[c("SEACell","manual_NI.purity","manual_NI.main")]
-    
-    meta.suma=left_join(meta.suma,meta.suma.NI,by="SEACell") %>% as.data.frame()
-    rownames(meta.suma)=meta.suma$SEACell
-    meta.suma$SEACell=NULL
-    print(head(meta.suma[1:3,]))
-    
-    if(is.null(mat_c)){
-      mat_c=mat
-    }else{
-      mat_c=left_join(mat_c,mat)
-    }
-    
-    if(is.null(meta_c)){
-      meta_c=meta.suma
-    }else{
-      meta_c=rbind(meta_c,meta.suma)
-    }
-    #srt=CreateSeuratObject(counts=mat)
-    #srt=AddMetaData(srt,meta.suma)
-    #return(srt)
-  }
-  mat_c=as.data.frame(mat_c)
-  rownames(mat_c)=mat_c$X
-  mat_c$X=NULL
-  mat_c[is.na(mat_c)]=0
-  srt=CreateSeuratObject(mat_c)
-  srt=AddMetaData(srt,meta_c)
-  srt$type=srt$predicted.celltype.l2.main
-  srt$CT=getField(rownames(srt@meta.data),sep = "_",3)
-  srt$individual=getField(rownames(srt@meta.data),sep = "_",2)
-  srt=AddMetaData(srt,metadata=colSums(LayerData(srt)),col.name = "nCount_RNA")
-  return(srt)
-}
 
 
 # Function: modAzimuthAnnotation

@@ -2529,7 +2529,7 @@ generateAnnotationFile(full.file = srt,cols=c("manual.level1","manual.level2","p
                        out.path = "/tmpdata/LyuLin/analysis/circadian/R/cell.annotation.clean.sct.Azimuth.tsv")
 
 # read metacell 
-srt.metacell<-readAllMetaCell('/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell/',std.cellranger.out = F)
+srt.metacell<-readAllMetaCell('/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell.0.04/',std.cellranger.out = F)
 #srt.metacell$sample<-case_when(paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT15","ZYRCT15","JJCCT19","LYHCT15") ~ "X5_250409MIX01",
 #                      paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT35","ZYRCT27","JJCCT15","LYHCT27") ~ "X5_250424MIX02",
 #                      paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT23","ZYRCT23","JJCCT35","LYHCT31") ~ "X5_250424MIX03",
@@ -2539,13 +2539,14 @@ srt.metacell<-readAllMetaCell('/tmpdata/LyuLin/analysis/circadian/R/preparation_
 #                      paste0(srt.metacell$individual,srt.metacell$CT) %in% c("KDCT19","ZYRCT19","JJCCT11","LYHCT19") ~ "X5_250424MIX07")
 srt.metacell$sample<-paste0(srt.metacell$individual,"_",srt.metacell$CT)
 srt.metacell<-subset(srt.metacell,predicted.celltype.l2.purity>=0.90)
-srt.metacell<-integrateSubset(srt.metacell)
+srt.metacell<-integrateSubset(srt.metacell,k.weight = 50)
 DimPlot(srt.metacell,group.by = "type")
-plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "CLOCK",norm.dist = T,split = T)
+plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "NR1D2",norm.dist = T)
 
-plotPseudobulkByCTByIndividual(srt.metacell,"CD14 Mono","PER2",
+plotPseudobulkByCTByIndividual(srt,"CD14 Mono","NR1D2",
                                time.points = c("CT11","CT15","CT19","CT23","CT27","CT31","CT35"),
-                               normalize.data = T,plot = "errorbar",proportion = 0.05)
+                               normalize.data = T,plot = "errorbar",proportion = 0.5)
+saveRDS(srt.metacell,"seacell.0.04.rds")
 
 #use drc package to analyse ELISA data
 ## melatonin data
@@ -2629,3 +2630,67 @@ ggplot(all_cortisol_data)+geom_boxplot(aes(x=CT,y=relative_concentration))+
   geom_point(aes(x=CT,y=relative_concentration))+ylab("z-score")+
   ggtitle("z-score of cortisol")+theme(axis.text.x = element_text(angle=60,hjust=1))
 saveRDS(all_cortisol_data,"ELISA_cortisol.rds")
+
+# analyse metacell result
+AllJTKresult<-readJTKFromMetaCells('/tmpdata/LyuLin/analysis/circadian/R/seacell.meta2d.0.04')
+AllJTKresult.filtered<-filter(AllJTKresult,ADJ.P<0.05,PER>=20,PER<=28)
+#filter for genes oscillate in at least 2 people
+filtered.genes<-AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
+filtered.genes<-filtered.genes$CycID %>% unique()
+AllJTKresult.filtered<-AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
+(AllJTKresult.filtered[c("CycID","celltype")] %>% unique())$celltype %>% table() %>% as.data.frame()
+
+plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "RPS27",norm.dist = T)
+srt<-readRDS('7mixed.integrated.annotated.clean.sct.Azimuth.rds')
+
+# scrutinize batch 
+srt@meta.data[is.na(srt@meta.data$sample),"sample"]="X5_250424MIX03"
+saveRDS(srt,'7mixed.integrated.annotated.clean.sct.Azimuth.rds')
+
+srt$type<-srt$predicted.celltype.l2
+matBySample<-srt2bulkMatrix(srt.metacell,c("individual","CT","type"),layer = "data",normalize = T)
+matBySample<-rownames_to_column(matBySample,"feature")
+matBySample.nr<-matBySample %>% gather(key="key",value="count",-feature)
+matBySample.nr$individual<-getField(matBySample.nr$key,"-",1)
+matBySample.nr$CT<-getField(matBySample.nr$key,"-",2)
+matBySample.nr$type<-getField(matBySample.nr$key,"-",3)
+matBySample.nr$key<-getField(matBySample.nr$key,"-",c(1,2))
+matBySample.nr$batch<-BATCH[matBySample.nr$key]
+matBySample.nr[is.na(matBySample.nr$count),"count"]<-0
+saveRDS(matBySample.nr,'matBySample.rds')
+
+calculateCorBatch("CD4_TCM","LYZ",matBySample.nr)
+batch.by.individual.type=NULL
+calculateCorBatch<-function(arg.type,arg.feature,mat){
+  this.data=dplyr::filter(mat,feature==arg.feature,type==arg.type)[c("batch","individual","count")] %>% spread(key="individual",value="count")
+  this.data=column_to_rownames(this.data,"batch")
+  print(cor(this.data))
+  this.cor=cor(this.data)[upper.tri(cor(this.data), diag = FALSE)]
+  this.batch.data=data.frame("feature"=rep(arg.feature,length(this.cor)),"type"=rep(arg.type,length(this.cor)),"cor"=this.cor)
+  return(this.batch.data)
+}
+
+srt.metacell$type<-srt.metacell$predicted.celltype.l2.main
+classic_oscillating<-AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% CIRCADIAN_GENES_MAIN,]
+ggplot(classic_oscillating)+geom_point(aes(x=CycID,y=LAG,color=celltype,shape=individual))
+
+classic_oscillating$cor_to_batch<-NA
+for(i in 1:nrow(classic_oscillating)){
+  classic_oscillating$cor_to_batch[i]=median(calculateCorBatch(gsub(" ","_",classic_oscillating$celltype[i]),
+                                                        classic_oscillating$CycID[i],matBySample.nr)$cor)
+}
+
+srt.drop.list<-list()
+
+srt.drop<-Read10X('/tmpdata/LyuLin/tmp/tmp/X5_250424MIX07/raw_feature_bc_matrix/')
+srt.drop <- CreateSeuratObject(srt.drop, min.cells = 3, min.features = 0)
+ggplot(srt.drop@meta.data)+geom_density(aes(x=nFeature_RNA))+xlim(c(6,500))+
+  geom_vline(xintercept = 50,linetype=2)+geom_vline(xintercept = 175,linetype=2)+
+  annotate("text", x = 50, y = Inf, label = "50", vjust = 2, size = 3, color = "red",hjust=-0.5) +
+  annotate("text", x = 150, y = Inf, label = "175", vjust = 2, size = 3, color = "red",hjust=-0.5)+
+  ylab("density")+ggtitle("sample: X5_250424MIX07\nnFeature of empty drop")
+srt.drop.list<-c(srt.drop.list,subset(srt.drop,nFeature_RNA>50&nFeature_RNA<=175))
+rm(srt.drop)
+gc()
+
+saveRDS(srt.drop.list,"/tmpdata/LyuLin/analysis/circadian/R/empty.drop.rds")
