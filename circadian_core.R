@@ -2472,24 +2472,69 @@ plotCountOscilattingByMetaCelltypeByCT<-function(JTK.result,threshold.ADJ.P=0.05
 ##
 # upstream: readJTKFromMetaCells
 # downstream: NSF
-# dependency: NSF
+# dependency: enrichGObyHGNC
 # caller: NSF
-#plotEnrichGObyCT<-function(JTK.result,threshold.ADJ.P=0.05,PER.floor=20,PER.ceiling=28){
-#  AllJTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
-#  #filter for genes oscillate in at least 2 people
-#  filtered.genes=AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
-#  filtered.genes=filtered.genes$CycID %>% unique()
-#  AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
-#  print(head(AllJTKresult.filtered))
-#  for(lag in )
-#}
+plotEnrichGObyCT<-function(JTK.result,type,threshold.ADJ.P=0.05,PER.floor=20,PER.ceiling=28,return.data=F){
+  JTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
+  #filter for genes oscillate in at least 2 people
+  filtered.genes=JTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
+  filtered.genes=filtered.genes$CycID %>% unique()
+  JTKresult.filtered=JTKresult.filtered[JTKresult.filtered$CycID %in% filtered.genes,]
+  print(head(JTKresult.filtered))
+  plotdata=NULL
+  for(lag in seq(0,24,2)){
+    genes=dplyr::filter(JTKresult.filtered,LAG==lag,celltype==type)$CycID %>% unique
+    print(head(genes))
+    if(length(genes)==0){
+      next
+    }
+    out=enrichGObyHGNC(genes)
+    out=dplyr::filter(out@result,p.adjust<0.01)
+    print(head(out))
+    if(nrow(out)==0){
+      next
+    }
+    out$Lag=lag
+    if(is.null(plotdata)){
+      plotdata=out
+    }else{
+      plotdata=rbind(plotdata,out)
+    }
+  }
+  plotdata$category=Ontology(plotdata$ID)
+  #plotdata=plotdata %>% group_by(Lag) %>% arrange(p.adjust) %>% top_n(-10,p.adjust)
+  
+  #plotdata=plotdata[,c("Lag","ID")]
+  #print(head(plotdata))
+  #n_total_ID=length(plotdata$ID)
+  #n_blank=floor(0.3*n_total_ID)
+  #plotdata=rbind(plotdata,data.frame("Lag"=sort(rep(seq(0,22,2),n_blank)),"ID"=rep(paste0("AO:",1:n_blank),12)))
+  #plotdata$Lag=as.factor(plotdata$Lag)
+  #plotdata$plotpadding=ifelse(grepl("AO",plotdata$ID),"blank","data")
+  if(return.data){
+    return(plotdata)
+  }
+  ggplot(plotdata)+geom_tile(aes(x=Lag,y=fct_infreq(ID),fill=plotpadding,color=plotpadding))+NoLegend()+
+      geom_text(data=plotdata[plotdata$plotpadding!="blank",],aes(x=Lag,y=fct_infreq(ID),label=fct_infreq(ID)))+
+      theme(axis.text.y = element_blank(),axis.ticks.y = element_blank(),panel.background = element_rect(fill="white"))+
+      scale_fill_manual(values = c("white","lightblue"))+scale_color_manual(values = c("white","black"))+ylab("")+xlab("")
+}
 
-#enrichGObyHGNC
-#change HGNC gene symbols to ENTREZ ID and then query for GO terms
-enrichGObyHGNC<-function(genes,backgroud.genes){
+# Function: enrichGObyHGNC
+# change HGNC gene symbols to ENTREZ ID and then query for GO terms
+##
+# dependency: NSF
+# caller: plotEnrichGObyCT
+# upstream: NSF
+# downstream: NSF
+enrichGObyHGNC<-function(genes,backgroud.genes=NULL,ont="BP"){
   gene_ids=bitr(genes,fromType = "SYMBOL",toType = "ENTREZID",OrgDb = org.Hs.eg.db)$ENTREZID
-  gene_ids_bg=bitr(backgroud.genes,fromType = "SYMBOL",toType = "ENTREZID",OrgDb = org.Hs.eg.db)$ENTREZID
-  out=enrichGO(gene_ids,OrgDb = org.Hs.eg.db,universe = gene_ids_bg)
+  if(!is.null(backgroud.genes)){
+    gene_ids_bg=bitr(backgroud.genes,fromType = "SYMBOL",toType = "ENTREZID",OrgDb = org.Hs.eg.db)$ENTREZID
+    out=enrichGO(gene_ids,OrgDb = org.Hs.eg.db,universe = gene_ids_bg,ont = ont,pool = T)
+  }else{
+    out=enrichGO(gene_ids,OrgDb = org.Hs.eg.db,ont = ont,pool = T)
+  }
   return(out)
 }
 

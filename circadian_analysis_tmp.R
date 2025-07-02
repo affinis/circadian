@@ -2694,3 +2694,15 @@ rm(srt.drop)
 gc()
 
 saveRDS(srt.drop.list,"/tmpdata/LyuLin/analysis/circadian/R/empty.drop.rds")
+
+AllJTKresult.filtered<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.rds')
+AllJTKresult.filtered[is.na(AllJTKresult.filtered$cor_to_batch),"cor_to_batch"]=0
+n.individual.res<-AllJTKresult.filtered %>% group_by(CycID,celltype) %>% summarise(n.individual=n()) %>% filter(n.individual>=2)
+AllJTKresult.filtered<-left_join(AllJTKresult.filtered,n.individual.res,by=c("CycID","celltype")) %>% dplyr::filter(!is.na(n.individual),cor_to_batch<0.6)
+
+AllJTKresult.filtered$celltype %>% table()
+target_genes<-(AllJTKresult.filtered %>% dplyr::filter(.,celltype=="CD14 Mono"))$CycID %>% unique()
+out<-enrichGObyHGNC(target_genes)
+dotplot(out)
+dplyr::filter(out@result,p.adjust<0.05)
+plotdata<-plotEnrichGObyCT(AllJTKresult.filtered,"CD4 TCM",return.data = T)

@@ -25,7 +25,7 @@ for (i in 1:nrow(AllJTKresult.filtered)) {
     type=AllJTKresult.filtered$celltype[i] %>% gsub(" ","_",.)
     message(paste0(i," ",feature," ",type))
     cor=median(calculateCorBatch(type,feature,matBySample.nr)$cor)
-    AllJTKresult.filtered$cor[i]=cor
+    AllJTKresult.filtered$cor_to_batch[i]=cor
   }else{
     next
   }

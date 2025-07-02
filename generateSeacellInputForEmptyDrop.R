@@ -17,7 +17,9 @@ for (i in 1:length(samples)) {
   this.srt=srt.list[[i]]
   new_cell_ids <- paste0(samples[i],"_",colnames(this.srt))
   this.srt=RenameCells(this.srt,new.names = new_cell_ids)
-  all_cell_ids=c(all_cell_ids,new_cell_ids)
+  sampled_ids=sample(new_cell_ids,10000,F)
+  this.srt=subset(this.srt,cells=sampled_ids)
+  all_cell_ids=c(all_cell_ids,sampled_ids)
   
   count_matrix=GetAssayData(object = this.srt, assay = "RNA", slot = "counts")
   
