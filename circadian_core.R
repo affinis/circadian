@@ -123,6 +123,11 @@ BATCH<-c("JJC-CT11"="X5_250424MIX07","JJC-CT15"="X5_250424MIX02","JJC-CT19"="X5_
          "KD-CT11"="X5_250424MIX06","KD-CT15"="X5_250409MIX01","KD-CT19"="X5_250424MIX07","KD-CT23"="X5_250424MIX03","KD-CT27"="X5_250424MIX05","KD-CT31"="X5_250424MIX04","KD-CT35"="X5_250424MIX02",
          "ZYR-CT11"="X5_250424MIX04","ZYR-CT15"="X5_250409MIX01","ZYR-CT19"="X5_250424MIX07","ZYR-CT23"="X5_250424MIX03","ZYR-CT27"="X5_250424MIX02","ZYR-CT31"="X5_250424MIX05","ZYR-CT35"="X5_250424MIX06")
 
+BATCH_JJC<-c("X5_250424MIX07"="CT11","X5_250424MIX02"="CT15","X5_250409MIX01"="CT19","X5_250424MIX05"="CT23","X5_250424MIX06"="CT27","X5_250424MIX04"="CT31","X5_250424MIX03"="CT35")
+BATCH_LYH<-c("X5_250424MIX05"="CT11","X5_250409MIX01"="CT15","X5_250424MIX07"="CT19","X5_250424MIX04"="CT23","X5_250424MIX02"="CT27","X5_250424MIX03"="CT31","X5_250424MIX06"="CT35")
+BATCH_KD<-c("X5_250424MIX06"="CT11","X5_250409MIX01"="CT15","X5_250424MIX07"="CT19","X5_250424MIX03"="CT23","X5_250424MIX05"="CT27","X5_250424MIX04"="CT31","X5_250424MIX02"="CT35")
+BATCH_ZYR<-c("X5_250424MIX04"="CT11","X5_250409MIX01"="CT15","X5_250424MIX07"="CT19","X5_250424MIX03"="CT23","X5_250424MIX02"="CT27","X5_250424MIX05"="CT31","X5_250424MIX06"="CT35")
+
 #::::::::: ::::#
 # I/O FUNCTIONS
 #:::::::::: :::#
@@ -133,10 +138,10 @@ BATCH<-c("JJC-CT11"="X5_250424MIX07","JJC-CT15"="X5_250424MIX02","JJC-CT19"="X5_
 # std.cellranger.out: if seacells was run under cellranger multi path (like 'SAMPLEID/outs/per_sample_outs/SAMPLEID/count/seacells/'), set it TRUE, else false
 ##
 # upstream: <slurm>runSeaCells.slurm
-# downstream: <Rscript>wrapper.testRhythmicity.R
+# downstream: <Rscript>wrapper.testRhythmicity.R, plotMetaCellByIndividual
 # dependency: NSF
 # caller: NSF
-readAllMetaCell<-function(file.path,std.cellranger.out=T){
+readAllMetaCell<-function(file.path,std.cellranger.out=T,empty.drop.mode=F){
   if(std.cellranger.out){
     samples=PATIENTS %>% lapply(.,paste0,"_",1:6) %>% unlist()
   }else{
@@ -181,14 +186,19 @@ readAllMetaCell<-function(file.path,std.cellranger.out=T){
     meta.suma=meta.suma %>% group_by(SEACell) %>% mutate(predicted.celltype.l2.main=predicted.celltype.l2[which.max(Freq)])
     meta.suma=dplyr::filter(meta.suma,predicted.celltype.l2==predicted.celltype.l2.main)[c("SEACell","meta.cell.size","predicted.celltype.l2.purity","predicted.celltype.l2.main")]
     
-    meta.suma.NI=meta[c("manual_NI","SEACell")] %>% table() %>% as.data.frame()
-    meta.suma.NI=dplyr::filter(meta.suma.NI,manual_NI!="")
-    meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(meta.cell.size=sum(Freq))
-    meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(manual_NI.purity=Freq/meta.cell.size)
-    meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(manual_NI.main=manual_NI[which.max(Freq)])
-    meta.suma.NI=dplyr::filter(meta.suma.NI,manual_NI==manual_NI.main)[c("SEACell","manual_NI.purity","manual_NI.main")]
+    if("manual_NI" %in% colnames(meta)){
+      meta.suma.NI=meta[c("manual_NI","SEACell")] %>% table() %>% as.data.frame()
+      meta.suma.NI=dplyr::filter(meta.suma.NI,manual_NI!="")
+      meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(meta.cell.size=sum(Freq))
+      meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(manual_NI.purity=Freq/meta.cell.size)
+      meta.suma.NI=meta.suma.NI %>% group_by(SEACell) %>% mutate(manual_NI.main=manual_NI[which.max(Freq)])
+      meta.suma.NI=dplyr::filter(meta.suma.NI,manual_NI==manual_NI.main)[c("SEACell","manual_NI.purity","manual_NI.main")]
+      meta.suma=left_join(meta.suma,meta.suma.NI,by="SEACell") %>% as.data.frame()
+    }
     
-    meta.suma=left_join(meta.suma,meta.suma.NI,by="SEACell") %>% as.data.frame()
+    # must as.data.frame, because we need to add rownames, which will be used when using AddMetaData in pkg Seurat
+    # if not, annotations will be randomly assigned to each cell 
+    meta.suma=as.data.frame(meta.suma)
     rownames(meta.suma)=meta.suma$SEACell
     meta.suma$SEACell=NULL
     #print(head(meta.suma[1:3,]))
@@ -220,8 +230,17 @@ readAllMetaCell<-function(file.path,std.cellranger.out=T){
   print(meta_c[1:3,1:3])
   srt=AddMetaData(srt,meta_c)
   srt$type=srt$predicted.celltype.l2.main
-  srt$CT=getField(rownames(srt@meta.data),sep = "_",3)
-  srt$individual=getField(rownames(srt@meta.data),sep = "_",2)
+  if(!empty.drop.mode){
+    srt$CT=getField(rownames(srt@meta.data),sep = "_",3)
+    srt$individual=getField(rownames(srt@meta.data),sep = "_",2)
+  }else{
+    srt$individual="droplet"
+    srt$sample=getField(rownames(srt@meta.data),sep = "_",c(2,3))
+    srt@meta.data$CT_JJC=BATCH_JJC[srt@meta.data$sample]
+    srt@meta.data$CT_LYH=BATCH_LYH[srt@meta.data$sample]
+    srt@meta.data$CT_KD=BATCH_KD[srt@meta.data$sample]
+    srt@meta.data$CT_ZYR=BATCH_ZYR[srt@meta.data$sample]
+  }
   srt=AddMetaData(srt,metadata=colSums(LayerData(srt)),col.name = "nCount_RNA")
   return(srt)
 }
@@ -1290,16 +1309,26 @@ plotRhythmicityPvalue<-function(celltypes,p.cutoff=1,features=CIRCADIAN_GENES_MA
    guides(size=guide_legend(title="-log2(p)",override.aes=list(fill="black")),fill=FALSE)
 }
 
-plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dist=T){
+# Function: plotMetaCellByIndividual
+##
+# downstream: NSF
+# upstream: readAllMetaCell, metacell2srt
+# dependency: fetchMergedDataOneCellType, getField
+# caller: NSF
+plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dist=T,droplet.mode=F){
   data=fetchMergedDataOneCellType(srt,cell.type=cell.type,gene.list=feature,CT_field=3,patient_filed = c(1,2),layer=layer,filter_data=F)
-  control=srt[["nCount_RNA"]] %>% as.data.frame()
+  if(droplet.mode){
+    data$time=as.vector(srt$CT[data$observation])
+    data$time_numeric=as.numeric(gsub("CT","",data$time))
+  }
+  control=srt[["meta.cell.size"]] %>% as.data.frame()
   control=rownames_to_column(control,var = "observations")
   colnames(control)[2]="control_expression"
   print(head(data))
   print(head(control))
   data=left_join(data,control)
   #data$normalized=data$values/data$control_expression
-  data$normalized=1000000*data$values/data$control_expression
+  data$normalized=data$values/data$control_expression
   data=data %>% group_by(time,patient) %>% mutate(mean_expression=mean(log(normalized+1))) %>% group_by(patient) %>%
     mutate(relative_expression=(mean_expression-mean(mean_expression))/sd(mean_expression))
   data=data %>% group_by(time) %>% mutate(mean_relative=mean(relative_expression),sd_relative=sd(relative_expression))
@@ -1309,12 +1338,12 @@ plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dis
   print(head(data))
   if(layer=="data"){
     ggplot(data)+geom_boxplot(aes(x=time,y=values))+
-      geom_jitter(aes(x=time,y=values))+facet_wrap(~patient,scale="free_y")+
-      ggtitle(paste0(cell.type,": ",feature))
+      geom_jitter(aes(x=time,y=values),alpha=0.5)+facet_wrap(~patient,scale="free_y")+
+      ggtitle(paste0(cell.type,": ",feature))+theme_bw()
   }else{
     ggplot(data)+geom_boxplot(aes(x=time,y=normalized))+
-      geom_jitter(aes(x=time,y=normalized))+facet_wrap(~patient,scale="free_y")+
-      ggtitle(paste0(cell.type,": ",feature))
+      geom_jitter(aes(x=time,y=normalized),alpha=0.5)+facet_wrap(~patient,scale="free_y")+
+      ggtitle(paste0(cell.type,": ",feature))+theme_bw()
   }
 
   #if(norm.dist){
@@ -2250,6 +2279,13 @@ cateSub<-function(vector,categories.ori,categories.nov){
   return(vector)
 }
 
+# Function: srt2bulkMatrix
+# convert srt object to pseudo-bulk matrix, can split by up to 3 meta.data
+## free function
+# upstream: NSF
+# downstream: NSF
+# caller: NSF
+# dependency: NSF
 srt2bulkMatrix<-function(srt,split.by,layer="count",normalize=F){
   res=NULL
   if(length(split.by)==1){
@@ -2356,6 +2392,11 @@ generateAdjacencyMatrix<-function(JTK_CYCL_out,spread=F){
 }
 
 #plotNetWorkCircadian
+##
+# upstream: NSF
+# downstream: NSF
+# caller: NSF
+# dependency: generateAdjacencyMatrix
 plotNetWorkCircadian<-function(srt,JTK.result.filtered){
   nFeatureType=srt@meta.data[,c("nFeature_RNA","type")] %>% group_by(type) %>% summarise(median_genes=max(nFeature_RNA))
   nCircadianType=JTK.result.filtered$celltype %>% table %>% as.data.frame() %>% `colnames<-`(c("type","circadian_genes"))
@@ -2433,9 +2474,9 @@ plotRadarCellType<-function(srt,celltypes,feature,colors=generateColor(25)){
 plotCountOscilattingByMetaCelltype<-function(JTK.result,threshold.ADJ.P=0.05,PER.floor=20,PER.ceiling=28){
   AllJTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
   #filter for genes oscillate in at least 2 people
-  filtered.genes=AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
-  filtered.genes=filtered.genes$CycID %>% unique()
-  AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
+  #filtered.genes=AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
+  #filtered.genes=filtered.genes$CycID %>% unique()
+  #AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
   plotdata=(AllJTKresult.filtered[c("CycID","celltype")] %>% unique())$celltype %>% table() %>% as.data.frame()
   colnames(plotdata)[1]="cell_type"
   plotdata$main_type=celltypes[as.vector(plotdata$cell_type)] %>% as.character()
@@ -2443,7 +2484,7 @@ plotCountOscilattingByMetaCelltype<-function(JTK.result,threshold.ADJ.P=0.05,PER
   ggplot(plotdata)+geom_bar(aes(x=cell_type,y=Freq,fill=main_type),stat="identity",color="black")+
     scale_y_continuous(expand = c(0,0),limits = c(0,max(plotdata$Freq)+100))+scale_x_discrete(limits=names(celltypes))+
     theme(axis.text.x = element_text(angle=60,hjust=1),panel.background = element_rect(fill="white",color="black"),
-          panel.grid = element_line(color="grey"))+
+          panel.grid.major.y = element_line(color="grey"))+
     scale_fill_manual(values = generateColor(n = length(unique(plotdata$main_type))))+
     ylab("# of oscillating genes")+ xlab("")+NoLegend()
 }
@@ -2458,13 +2499,13 @@ plotCountOscilattingByMetaCelltype<-function(JTK.result,threshold.ADJ.P=0.05,PER
 plotCountOscilattingByMetaCelltypeByCT<-function(JTK.result,threshold.ADJ.P=0.05,PER.floor=20,PER.ceiling=28){
   AllJTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
   #filter for genes oscillate in at least 2 people
-  filtered.genes=AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
-  filtered.genes=filtered.genes$CycID %>% unique()
-  AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
+  #filtered.genes=AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
+  #filtered.genes=filtered.genes$CycID %>% unique()
+  #AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
   plotdata=AllJTKresult.filtered[c("celltype","LAG","individual")] %>% table() %>% as.data.frame()
   print(head(plotdata))
   ggplot(plotdata)+geom_bar(aes(x=LAG,y=Freq,fill=celltype),stat="identity")+
-    facet_wrap(~individual+celltype,scale="free_y")
+    facet_grid(rows=vars(celltype),cols=vars(individual),scale="free")
 }
 
 # Function: plotEnrichGObyCT
@@ -2474,12 +2515,12 @@ plotCountOscilattingByMetaCelltypeByCT<-function(JTK.result,threshold.ADJ.P=0.05
 # downstream: NSF
 # dependency: enrichGObyHGNC
 # caller: NSF
-plotEnrichGObyCT<-function(JTK.result,type,threshold.ADJ.P=0.05,PER.floor=20,PER.ceiling=28,return.data=F){
+plotEnrichGObyCT<-function(JTK.result,type,threshold.ADJ.P=0.05,PER.floor=20,PER.ceiling=28){
   JTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
   #filter for genes oscillate in at least 2 people
-  filtered.genes=JTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
-  filtered.genes=filtered.genes$CycID %>% unique()
-  JTKresult.filtered=JTKresult.filtered[JTKresult.filtered$CycID %in% filtered.genes,]
+  #filtered.genes=JTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
+  #filtered.genes=filtered.genes$CycID %>% unique()
+  #JTKresult.filtered=JTKresult.filtered[JTKresult.filtered$CycID %in% filtered.genes,]
   print(head(JTKresult.filtered))
   plotdata=NULL
   for(lag in seq(0,24,2)){
@@ -2511,13 +2552,127 @@ plotEnrichGObyCT<-function(JTK.result,type,threshold.ADJ.P=0.05,PER.floor=20,PER
   #plotdata=rbind(plotdata,data.frame("Lag"=sort(rep(seq(0,22,2),n_blank)),"ID"=rep(paste0("AO:",1:n_blank),12)))
   #plotdata$Lag=as.factor(plotdata$Lag)
   #plotdata$plotpadding=ifelse(grepl("AO",plotdata$ID),"blank","data")
-  if(return.data){
-    return(plotdata)
+ 
+  # First, ensure your data is properly structured
+  plotdata$Lag=factor(plotdata$Lag,levels=factor(seq(0,22,2)))
+  plotdata$label.position=ifelse(plotdata$FoldEnrichment<length(plotdata$Description)*0.75,
+                                  plotdata$FoldEnrichment,
+                                  plotdata$FoldEnrichment/3)
+  
+  # Create the plot with perfectly aligned labels
+  plotdata<-arrange(plotdata,desc(log2(FoldEnrichment)))
+  plotdata$index<-1:nrow(plotdata)
+  assign("runtime.plotEnrichGObyCT.plotdata",plotdata,envir=.GlobalEnv)
+  main=ggplot(plotdata) +
+    geom_bar(aes(x = Lag, y = FoldEnrichment,fill = Lag,group = Lag,alpha=-log10(p.adjust)),stat="identity",
+             position = position_dodge2(width = 2,preserve = "single"),width = 1.9,color="black") +
+    geom_point(aes(x=Lag, y=max(FoldEnrichment)+4,group = Lag),color="black",shape=21,position = position_dodge2(width =1.9,preserve = "single"),size=5)+
+    geom_text(aes(x=Lag, y=max(FoldEnrichment)+4,group = Lag,label=index),position = position_dodge2(width =1.9,preserve = "single"),size=3)+
+    scale_y_continuous(expand = c(0,0))+scale_x_discrete(limits=factor(seq(0,22,2)))+
+    theme(axis.text.y=element_blank(),axis.ticks.y=element_blank(),
+          axis.text.x=element_text(size=11,vjust =-4,color="black"),
+          panel.background=element_rect(fill = "white"),
+          panel.grid.major.x = element_line(color="grey",linewidth=1),
+          panel.grid.major.y = element_line(color="grey",linewidth=0.5),
+          plot.margin=margin(0,0,0,0,"cm"),legend.position = "top")+
+    labs(x = "circadian time", y = "log2(fold enrichment)",fill="peaking time",color="peaking time")+scale_fill_bmj()+scale_color_bmj()+
+    ylim(c(-10,5+max(plotdata$FoldEnrichment)))+coord_polar()
+  legend=ggplot(plotdata)+geom_point(aes(x=3,y=-index),color="black",shape=21,size=5)+
+    geom_text(aes(x=5,y=-index,label=Description,color=Lag),hjust=0)+geom_text(aes(x=3,y=-index,label=index),size=3)+
+    scale_x_continuous(limits=c(0.8,100),expand = c(0,0))+theme_no_axes()+scale_color_bmj()+NoLegend()
+  ggarrange(main,legend,align="h",common.legend = T,ncol=2)
+}
+
+# Function: plotPeakAmongIndividuals
+##
+# 
+plotPeakAmongIndividuals<-function(JTKresult,gene){
+  plotdata=JTKresult[JTKresult$CycID==gene,]
+  if(nrow(plotdata)==0){
+    stop("no data available")
   }
-  ggplot(plotdata)+geom_tile(aes(x=Lag,y=fct_infreq(ID),fill=plotpadding,color=plotpadding))+NoLegend()+
-      geom_text(data=plotdata[plotdata$plotpadding!="blank",],aes(x=Lag,y=fct_infreq(ID),label=fct_infreq(ID)))+
-      theme(axis.text.y = element_blank(),axis.ticks.y = element_blank(),panel.background = element_rect(fill="white"))+
-      scale_fill_manual(values = c("white","lightblue"))+scale_color_manual(values = c("white","black"))+ylab("")+xlab("")
+  plotdata$celltype=as.factor(plotdata$celltype)
+  ggplot(plotdata)+geom_vline(aes(xintercept=as.numeric(celltype)))+
+    geom_segment(aes(x=as.numeric(celltype)-0.1,xend=as.numeric(celltype)+0.1,y=LAG,yend=LAG,color=individual),size=2)+
+    ylim(c(0,23))+scale_x_discrete(limits = levels(plotdata$celltype)) +
+    labs(x = "", y = "peaking time",title = paste0("phase of ",gene,"\namong individuals")) + scale_color_aaas()+
+    theme_minimal()+theme(axis.text.x = element_text(angle = 60, hjust = 1, color="black"),
+                          axis.text.y = element_text(color="black"),
+                          plot.title = element_text(hjust=0.5))+NoLegend()
+}
+
+# Function: plotOscillatingGeneSummarise
+##
+# upstream: readJTKFromMetaCells
+# downstream: NSF
+# caller: NSF
+# dependency: NSF
+plotOscillatingGeneSummarise<-function(JTKresult){
+  allplotdata=NULL
+  for(celltype in unique(JTKresult$celltype)){
+    n.ocurrence.suma=JTKresult[JTKresult$celltype==celltype,] %>% group_by(CycID) %>% summarise(n.ocurrence=n(),minus.log.adjp=median(-log10(ADJ.P)),amp=median(AMP))
+    print(head(n.ocurrence.suma))
+    plotdata=n.ocurrence.suma
+    plotdata$celltype=celltype
+    if(is.null(allplotdata)){
+      allplotdata=plotdata
+    }else{
+      allplotdata=rbind(allplotdata,plotdata)
+    }
+  }
+
+  ggplot(allplotdata)+geom_point(aes(x=amp,y=minus.log.adjp,size=n.ocurrence,color=celltype),alpha=0.7)+
+    facet_wrap(~celltype,scales="free")+
+    geom_text_repel(data = allplotdata[allplotdata$n.ocurrence>=2,],aes(x=amp,y=minus.log.adjp,label=CycID),hjust=1,vjust=1)+
+    scale_color_aaas()+labs(x="peaking expression",y="-log10(p.adj)")+
+    theme_minimal(base_size = 12)+theme(strip.text = element_text(size = 12))
+}
+
+# Function: plotExpressionWithSoup
+##
+# upstream: readAllMetaCell, metacell2srt
+# downstream: NSF
+# caller: NSF
+# dependency: NSF
+plotExpressionWithSoup<-function(srt.metacell,srt.metacell.drop,target.feature){
+  nk=srt.metacell@meta.data[srt.metacell@meta.data$type=="NK",] %>% rownames()
+  cd14mono=srt.metacell@meta.data[srt.metacell@meta.data$type=="CD14 Mono",] %>% rownames()
+  cd4tcm=srt.metacell@meta.data[srt.metacell@meta.data$type=="CD4 TCM",] %>% rownames()
+  cd8tem=srt.metacell@meta.data[srt.metacell@meta.data$type=="CD8 TEM",] %>% rownames()
+  bmemory=srt.metacell@meta.data[srt.metacell@meta.data$type=="B memory",] %>% rownames()
+  soup=srt.metacell.drop@meta.data[srt.metacell.drop@meta.data$type=="empty_droplet",] %>% rownames()
+  
+  cd14mono_exp=(LayerData(srt.metacell,layer = "count",feature=target.feature) %>% as.data.frame())[cd14mono] %>% as.data.frame() %>% t%>% as.data.frame()
+  nk_exp=(LayerData(srt.metacell,layer = "count",feature=target.feature) %>% as.data.frame())[nk] %>% as.data.frame() %>% t %>% as.data.frame()
+  cd4tcm_exp=(LayerData(srt.metacell,layer = "count",feature=target.feature) %>% as.data.frame())[cd4tcm] %>% as.data.frame() %>% t %>% as.data.frame()
+  cd8tem_exp=(LayerData(srt.metacell,layer = "count",feature=target.feature) %>% as.data.frame())[cd8tem] %>% as.data.frame() %>% t %>% as.data.frame()
+  bmemory_exp=(LayerData(srt.metacell,layer = "count",feature=target.feature) %>% as.data.frame())[bmemory] %>% as.data.frame() %>% t %>% as.data.frame()
+  soup_exp=(LayerData(srt.metacell.drop,layer = "count",feature=target.feature) %>% as.data.frame())[soup] %>% as.data.frame() %>% t %>% as.data.frame()
+  
+  
+  cd14mono_exp$type="CD14 Mono"
+  nk_exp$type="NK"
+  cd4tcm_exp$type="CD4 TCM"
+  cd8tem_exp$type="CD8 TEM"
+  bmemory_exp$type="B memory"
+  soup_exp$type="soup"
+  plotdata=base::Reduce(rbind,list(cd14mono_exp,nk_exp,cd4tcm_exp,cd8tem_exp,bmemory_exp,soup_exp))
+  
+  metacell.size=srt.metacell@meta.data[c(nk,cd14mono,cd4tcm,cd8tem,bmemory),c("nCount_RNA","meta.cell.size")]
+  soup.size=srt.metacell.drop@meta.data[soup,c("nCount_RNA","meta.cell.size")]
+  cell.size=rbind(metacell.size,soup.size)
+  plotdata=merge(plotdata,cell.size,by="row.names")
+  plotdata$normalized.expression=plotdata[[target.feature]]/plotdata[["meta.cell.size"]]
+  assign("runtime.plotExpressionWithSoup.plotdata",plotdata,envir = .GlobalEnv)
+  raw=ggplot(plotdata)+geom_boxplot(aes(x=type,y=get(target.feature),group=type))+
+    ggtitle(paste0("raw expression of ",target.feature,"\n in metacells"))+
+    theme(axis.text.x = element_text(angle=60,hjust=1))
+  
+  norm=ggplot(plotdata)+geom_boxplot(aes(x=type,y=normalized.expression,group=type))+
+    ggtitle(paste0("normalized expression of ",target.feature,"\n in metacells"))+
+    theme(axis.text.x = element_text(angle=60,hjust=1))
+  
+  ggarrange(raw,norm)
 }
 
 # Function: enrichGObyHGNC
@@ -2538,8 +2693,13 @@ enrichGObyHGNC<-function(genes,backgroud.genes=NULL,ont="BP"){
   return(out)
 }
 
-#FetchExpressedGenesCellType
-#fetch a list of cell type expressed genes
+# function: FetchExpressedGenesCellType
+# fetch a list of cell type expressed genes
+## free function
+# upstream: NSF
+# downstream: NSF
+# dependency: NSF
+# caller: NSF
 FetchExpressedGenesCellType<-function(srt,cell.type,pct.express=0.05,idents="type"){
   cells=rownames(srt@meta.data)
   labels=srt@meta.data[,idents]
@@ -2587,4 +2747,19 @@ modAzimuthAnnotation<-function(srt){
   )
   return(srt)
 }
+
+# Function: metacell2srt
+## generate metacell seurat object
+# upstream: runSeaCells.sh, runSeaCells.slurm, runSeaCellsForDrop.slurm, runSeaCells.multiplexed.slurm
+# downstream: plotMetaCellByIndividual, plotExpressionWithSoup
+# caller: NSF
+# dependency: readAllMetaCell, integrateSubset
+metacell2srt<-function(meta.cell.path,out.rds.path,std.cellranger.out=F){
+  srt.metacell=readAllMetaCell(meta.cell.path,std.cellranger.out = std.cellranger.out)
+  srt.metacell$sample=paste0(srt.metacell$individual,"_",srt.metacell$CT)
+  srt.metacell=subset(srt.metacell,predicted.celltype.l2.purity>=0.90)
+  srt.metacell=integrateSubset(srt.metacell,k.weight = 50)
+  saveRDS(srt.metacell,out.rds.path)
+}
+
 

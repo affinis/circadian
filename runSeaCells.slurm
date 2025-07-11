@@ -3,56 +3,49 @@
 #SBATCH --job-name=SeaCells
 #SBATCH --partition=64c512g
 #SBATCH -N 1
-#SBATCH -n 36
-#SBATCH --output=log/seacells.out
-#SBATCH --error=log/seacells.err
-#SBATCH --open-mode=append
+#SBATCH -n 20
+#SBATCH --array=1-18
+#SBATCH --output=log/seacells_%a.out
+#SBATCH --error=log/seacells_%a.err
 
 echo "------start----------`date`----------start-------"
 
 #. ~/.bashrc_mini
 
-conda init
-conda activate seacells
+ID=$(cat id.seacells.lst | sed -n ${SLURM_ARRAY_TASK_ID}p)
 
-FILE_PATH=/dssg/home/acct-medll/medll/analysis/circadian/R/preparation_seacell
+#conda init
+source activate seacells
+
+FILE_PATH=/dssg/home/acct-medll/medll/analysis/circadian/R/preparation_seacell_EmptyDrop
 SEACELL_PY=/dssg/home/acct-medll/medll/script/pySC_core/calculateMetacellsWithSeacells.modforSrtConverted.py
-ANNOTATION=/dssg/home/acct-medll/medll/analysis/circadian/R/cell.annotation.clean.sct.Azimuth.tsv
+ANNOTATION=/dssg/home/acct-medll/medll/analysis/circadian/R/cell.annotations.manual1_2_NI.predicted2.modforSeacells.tsv
+proportion=0.08
+min_gene=200
 
-for sample in `ls $FILE_PATH | grep 'CT'`
-do
-	if [ ! -d $FILE_PATH/$sample/seacells ]
-	then
-		mkdir $FILE_PATH/$sample/seacells
-	fi
-	
-	cd $FILE_PATH/$sample
-	
-	if [ -f $sample/genes.tsv.gz ]
-	then
-		mv $sample/genes.tsv.gz $sample/features.tsv.gz
-	fi
+echo "`which python3`"
 
-	if [ -f $sample/features.tsv ]
-	then
-		gzip $sample/features.tsv
-	fi
+cd $FILE_PATH/$ID/outs/per_sample_outs/$ID/count/
+#cd $FILE_PATH
 
-	if [ `zgrep "Gene Expression" $sample/features.tsv.gz | wc -l` -eq 0 ]
-	then
-		zcat $sample/features.tsv.gz | sed 's/$/\tGene Expression/g' > $sample/features.tsv
-		mv $sample/features.tsv.gz $sample/features.tsv.gz.backup
-		gzip $sample/features.tsv
-	fi
-	#if [ ! -f barcodes.tsv.gz ]
-	#then
-	#		gzip barcodes.tsv
-	#fi
-	#cd ..
-	#prefix=`sed -e 's/_1/_CT9/g' -e 's/_2/_CT13/g' -e 's/_3/_CT17/g' -e 's/_4/_CT21/g' -e 's/_5/_CT1/g' -e 's/_6/_CT5/g' <<< $sample`
-	prefix=$sample
-	python3 $SEACELL_PY -i $sample -a $ANNOTATION -o seacells -p $prefix -r 0.05
-	cd
-done
+if [ ! -f sample_filtered_feature_bc_matrix/barcodes.tsv.gz ]
+then
+	gzip sample_filtered_feature_bc_matrix/barcodes.tsv
+fi
+
+if [ `zcat sample_filtered_feature_bc_matrix/barcodes.tsv.gz | grep '^TF' | wc -l` -eq 0 ]
+then
+	cp sample_filtered_feature_bc_matrix/barcodes.tsv.gz sample_filtered_feature_bc_matrix/barcodes.tsv.gz.backup
+	zcat sample_filtered_feature_bc_matrix/barcodes.tsv.gz | sed "s/^/TF_${ID}_/g" > sample_filtered_feature_bc_matrix/barcodes.tsv
+	gzip -f sample_filtered_feature_bc_matrix/barcodes.tsv
+fi
+
+if [ ! -d seacells_$proportion ]
+then
+	mkdir seacells_$proportion
+fi
+
+python3 $SEACELL_PY -i sample_filtered_feature_bc_matrix -a $ANNOTATION -o seacells_$proportion -p $ID -r $proportion -m $min_gene
+
 
 echo "------done----------`date`----------done-----------"

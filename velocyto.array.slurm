@@ -1,22 +1,27 @@
 #!/bin/bash
 
 #SBATCH --job-name=velocyto-array
-#SBATCH --partition=cpu
-#SBATCH -N 2
-#SBATCH -n 80
-#SBATCH --array=1-2
-#SBATCH --ntasks-per-node=40
-#SBATCH --output=log/velocyto_array_%A_%a.out
-#SBATCH --error=log/velocyto_array_%A_%a.err
+#SBATCH --partition=64c512g
+#SBATCH -N 1
+#SBATCH -n 64
+#SBATCH --array=1-6
+#SBATCH --exclusive
+#SBATCH --output=log/velocyto_array_%a.out
+#SBATCH --error=log/velocyto_array_%a.err
 
 #echo "`which samtools`"
 
-. ~/.bashrc_mini
+#. ~/.bashrc_mini
+conda init
 conda activate velocyto
 
-VELOCYTO=/lustre/home/miniconda3/envs/velocyto/bin/velocyto
+export PATH=/dssg/home/acct-medll/medll/miniconda3/envs/velocyto/bin:$PATH
+
+VELOCYTO=~/miniconda3/envs/velocyto/bin/velocyto
 ID=$(cat id.lst | sed -n ${SLURM_ARRAY_TASK_ID}p)
-CR_OUTS=/lustre/home/acct-medll/medll/data/cellranger_out/${ID}/outs/per_sample_outs/${ID}/count
+CR_OUTS=~/analysis/cellranger/${ID}/outs/per_sample_outs/${ID}/count
+REF=/dssg/home/acct-medll/medll/ref/cellranger/refdata-gex-GRCh38-2024-A/genes/genes.gtf
+MASK=/dssg/home/acct-medll/medll/ref/hg38_rmsk.gtf
 echo $CR_OUTS
 
 if [ ! -f $CR_OUTS/sample_filtered_feature_bc_matrix/barcodes.tsv ]
@@ -28,4 +33,4 @@ fi
 
 ulimit -n 2048
 
-velocyto run -b $CR_OUTS/sample_filtered_feature_bc_matrix/barcodes.tsv -o $CR_OUTS/velocyto/ -m /lustre/home/acct-medll/medll/ref/repeat_mask/hg38_rmsk.gtf $CR_OUTS/sample_alignments.bam /lustre/home/acct-medll/medll/ref/cellranger_ref/refdata-gex-GRCh38-2020-A/genes/genes.gtf --samtools-memory 800 --samtools-threads 32
+$VELOCYTO run -b $CR_OUTS/sample_filtered_feature_bc_matrix/barcodes.tsv -o $CR_OUTS/velocyto/ -m $MASK $CR_OUTS/sample_alignments.bam --samtools-memory 2048 $REF 

@@ -6,18 +6,28 @@ library("groupdata2")
 
 # This is a wrapper to find oscillating genes with a metacell seurat object
 
-# upstream: readAllMetaCell
+# upstream: metacell2srt
 # downstream: readJTKFromMetaCells
 # dependency: NSF
 # caller: NSF
 
-srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.04.rds')
-srt<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.annotated.clean.sct.Azimuth.rds')
+srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.rds')
+#srt<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.annotated.clean.sct.Azimuth.rds')
+#srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.droplet.0.04.rds')
+#srt.metacell$CT<-srt.metacell$CT_ZYR
 
-mat<-as.data.frame(LayerData(srt.metacell,layer = "data"))
+mat<-as.data.frame(LayerData(srt.metacell,layer = "count"))
+cell.size<-srt.metacell[["meta.cell.size"]]$meta.cell.size
+mat<-as.data.frame(t(t(mat)/cell.size))
+
 mat<-rownames_to_column(mat,"feature")
 exp_table<-gather(mat,key="observation",value="value",-feature)
-out.dir<-"/tmpdata/LyuLin/analysis/circadian/R/seacell.meta2d.0.04/"
+#out.dir<-"/tmpdata/LyuLin/analysis/circadian/R/seacell.droplet.meta2d.0.04.ZYR/"
+out.dir<-"/tmpdata/LyuLin/analysis/circadian/R/seacell.meta2d.0.08.normalizedbyMetacellSize/"
+
+if(!dir.exists(out.dir)){
+  dir.create(out.dir)
+}
 
 meta.table<-srt.metacell@meta.data[,c("CT","type","individual")]
 meta.table<-rownames_to_column(meta.table,"observation")

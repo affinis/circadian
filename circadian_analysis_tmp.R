@@ -2540,13 +2540,14 @@ srt.metacell<-readAllMetaCell('/tmpdata/LyuLin/analysis/circadian/R/preparation_
 srt.metacell$sample<-paste0(srt.metacell$individual,"_",srt.metacell$CT)
 srt.metacell<-subset(srt.metacell,predicted.celltype.l2.purity>=0.90)
 srt.metacell<-integrateSubset(srt.metacell,k.weight = 50)
+saveRDS(srt.metacell,"seacell.0.04.rds")
 DimPlot(srt.metacell,group.by = "type")
 plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "NR1D2",norm.dist = T)
 
 plotPseudobulkByCTByIndividual(srt,"CD14 Mono","NR1D2",
                                time.points = c("CT11","CT15","CT19","CT23","CT27","CT31","CT35"),
                                normalize.data = T,plot = "errorbar",proportion = 0.5)
-saveRDS(srt.metacell,"seacell.0.04.rds")
+
 
 #use drc package to analyse ELISA data
 ## melatonin data
@@ -2706,3 +2707,46 @@ out<-enrichGObyHGNC(target_genes)
 dotplot(out)
 dplyr::filter(out@result,p.adjust<0.05)
 plotdata<-plotEnrichGObyCT(AllJTKresult.filtered,"CD4 TCM",return.data = T)
+
+
+# read droplet metacell
+srt.metacell.drop<-readAllMetaCell('/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell_EmptyDrop/',std.cellranger.out = F,empty.drop.mode = T)
+srt.metacell.drop<-integrateSubset(srt.metacell.drop,k.weight = 50)
+DimPlot(srt.metacell.drop,group.by = "sample")
+srt.metacell.drop$CT<-srt.metacell.drop$CT_JJC
+plotMetaCellByIndividual(srt.metacell.drop,cell.type = "empty_droplet",feature = "LYZ",norm.dist = T,droplet.mode = T)
+saveRDS(srt.metacell.drop,'/tmpdata/LyuLin/analysis/circadian/R/seacell.droplet.0.04.rds')
+fetchMergedDataOneCellType(srt.metacell.drop,gene.list = "LYZ",cell.type="empty_droplet",layer="count")
+
+srt.metacell.drop<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.droplet.0.04.rds')
+srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.04.rds')
+plotMetaCellByIndividual(srt.metacell,cell.type = "NK",feature = "LYZ",norm.dist = T,droplet.mode = T)
+plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "LYZ",norm.dist = T,droplet.mode = T)
+
+
+cd14monolyz$meta.cell.size=srt.metacell@meta.data[srt.metacell@meta.data$type=="CD14 Mono","meta.cell.size"]
+cor(cd14monolyz$LYZ,cd14monolyz$meta.cell.size)
+ggplot(cd14monolyz)+geom_point(aes(x=LYZ,y=meta.cell.size))
+
+
+# try to filter background noise
+AllJTKresult.filtered<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.rds")
+AllJTKresult.filtered<-AllJTKresult.filtered[AllJTKresult.filtered$fold_to_background>=1.3&AllJTKresult.filtered$cor_to_batch<0.2,]
+AllJTKresult.filtered<-AllJTKresult.filtered[!is.na(AllJTKresult.filtered$celltype) & !is.na(AllJTKresult.filtered$individual), ]
+nrow(AllJTKresult.filtered)
+ggplot(AllJTKresult.filtered)+geom_bar(aes(x=LAG,fill=celltype))+
+  facet_grid(rows = vars(celltype), cols = vars(individual), drop = FALSE,space = "free_x",scale="free_y")
+plotPeakAmongIndividuals(AllJTKresult.filtered,"DDIT4")
+plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "PER2")
+plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "PER2",layer = "data")
+
+
+plotEnrichGObyCT(AllJTKresult.filtered,type = "CD14 Mono")
+
+metacell2srt("/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell.0.08/",out.rds.path='../R/seacell.0.08.rds')
+
+srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.rds')
+DimPlot(srt.metacell,group.by = "predicted.celltype.l2.main",label = T)
+plotExpressionWithSoup(srt.metacell,srt.metacell.drop,target.feature = "LYZ")
+
+plotMetaCellByIndividual(srt.metacell,cell.type = "B intermediate",feature = "AIDA")
