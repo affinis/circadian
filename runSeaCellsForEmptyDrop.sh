@@ -6,14 +6,14 @@
 # caller:
 
 WRAPPER_PATH=/tmpdata/LyuLin/script/pySC_core/calculateMetacellsWithSeacells.modforSrtConverted.py
-FILE_PATH=/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell_EmptyDrop
-
+FILE_PATH=/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell_EmptyDrop.0.03
 ANNOTATION_FILE_PATH=/tmpdata/LyuLin/analysis/circadian/R/droplet.annotation.tsv
+MIN_GENE=40
+RATIO=0.03
 
 echo "------start----------`date`----------start-------"
 
-conda init
-conda activate seacells
+source activate seacells
 
 for sample in `ls $FILE_PATH`
 do
@@ -23,8 +23,7 @@ do
 	fi
 	cd $FILE_PATH/
 	prefix=$sample
-	python3 $WRAPPER_PATH -i $sample -a $ANNOTATION_FILE_PATH -o $sample/seacells -p $prefix -m 40 -r 0.04
-	cd ..
+	python3 $WRAPPER_PATH -i $sample -a $ANNOTATION_FILE_PATH -o $sample/seacells -p $prefix -m $MIN_GENE -r $RATIO
 done
 
 echo "------done----------`date`----------done-----------"

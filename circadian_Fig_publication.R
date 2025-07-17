@@ -1,8 +1,8 @@
 source('~/script/Rscript/circadian_core.R')
 
 #FIG. 1B
-test<-readRDS("../analysis/all.samples.oddsremoved.tsneran.Azimuth.rds")
-test$type<-test$predicted.celltype.l1.5
+test<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.annotated.clean.sct.Azimuth.rds")
+test$type<-test$predicted.celltype.l2
 celltypes<-test$type %>% unique() %>% sort()
 cell_legend_data<-data.frame("type"=celltypes,"pos.x"=rep(1,length(celltypes)),"pos.y"=rev(1:length(celltypes)),"ID"=1:length(celltypes))
 mappings<-cell_legend_data[,c("type","ID")]
@@ -12,16 +12,17 @@ dimplot_publication(test,reduction = "umap",reduction.name="umap",group.by = "ne
                     colors=generateColor(30,col.dist.min=0.3,seed = 10))+NoLegend()
 ggsave("/lustre/home/acct-medll/medll/figures/circadian/Fig1B.pdf",width=4.5,height=5)
 ggplot(cell_legend_data)+geom_point(aes(x=pos.x,y=pos.y,fill=type),shape=21,size=8,color="black")+
-  geom_text(aes(x=pos.x,y=pos.y,label=ID))+
+  geom_text(aes(x=pos.x,y=pos.y,label=ID),color="white")+
   geom_text(aes(x=pos.x+0.075,y=pos.y,label=type),hjust="left")+
   scale_x_continuous(limits=c(1,2))+scale_fill_manual(values=generateColor(30,col.dist.min=0.3,seed = 10))+
   theme_nothing()
 ggsave("/lustre/home/acct-medll/medll/figures/circadian/Fig1B_legend.pdf",width=3,height=6)
 
 #FIG. 1C
+test<-subset(test,type!="Eryth"&type!="Platelet")
 meta<-test@meta.data
-meta$CT<-factor(meta$CT,levels=CT_TIME_ORDER)
-meta$type<-meta$predicted.celltype.l1.5
+meta$CT<-factor(meta$CT,levels=sort(unique(meta$CT)))
+meta$type<-meta$predicted.celltype.l2
 celltypes<-sort(unique(meta$type))
 meta$type<-factor(meta$type,levels=rev(celltypes))
 
@@ -63,12 +64,13 @@ ggarrange(plotFIG1C1,plotFIG1C2,nrow=2,align="v",heights = c(1,5))
 ggsave('/lustre/home/acct-medll/medll/figures/circadian/Fig1C.pdf',width = 6,height=6)
 
 #FIG. 2A
-test<-readRDS("../analysis/all.samples.oddsremoved.tsneran.Azimuth.healthonly.rds")
-JTK.individual<-getAllJTK_CYCLEouts('../analysis/OSgenePredict_PseudoBulk_20k_all_genes_level1.5_by_individual2/',celltypes = celltypes)
-plotdata<-plotPseudobulkByCTByIndividual(test,"CD14 Mono","ARNTL",return.data = T)
-plotdata2<-plotPseudobulkByCTByIndividual(test,"NK","CRY1",return.data = T)
-plotdata3<-plotPseudobulkByCTByIndividual(test,"Plasma","PER3",return.data = T)
-plotdata4<-plotPseudobulkByCTByIndividual(test,"CD16 Mono","NR1D1",return.data = T)
+test<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds")
+JTK.individual<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.rds')
+#plotdata<-plotPseudobulkByCTByIndividual(test,"CD14 Mono","ARNTL",return.data = T)
+#plotdata2<-plotPseudobulkByCTByIndividual(test,"NK","CRY1",return.data = T)
+#plotdata3<-plotPseudobulkByCTByIndividual(test,"Plasma","PER3",return.data = T)
+#plotdata4<-plotPseudobulkByCTByIndividual(test,"CD16 Mono","NR1D1",return.data = T)
+plotMetaCellByIndividual(test,cell.type = "CD14 Mono",feature = "NR1D2",layer = "data")
 
 ggplot(plotdata)+geom_boxplot(aes(x=time,y=relative_expression))+
   geom_point(aes(x=time,y=relative_expression),alpha=0.5,color="blue",size=3)+

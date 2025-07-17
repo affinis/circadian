@@ -6,10 +6,10 @@
 # caller: NSF
 
 WRAPPER_PATH=/tmpdata/LyuLin/script/pySC_core/calculateMetacellsWithSeacells.modforSrtConverted.py
-FILE_PATH=/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell_byType
+FILE_PATH=/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell_byType.0.03
 
 ANNOTATION_FILE_PATH=/tmpdata/LyuLin/analysis/circadian/R/cell.annotation.clean.sct.Azimuth.tsv
-proportion=0.08
+proportion=0.03
 min_gene=200
 
 echo "------start----------`date`----------start-------"
@@ -25,8 +25,13 @@ do
 	fi
 	cd $FILE_PATH
 	prefix=$sample
-	python3 $WRAPPER_PATH -i $sample -a $ANNOTATION_FILE_PATH -o $sample/seacells_$proportion -p $prefix -r $proportion -m $min_gene
-	echo "$i/${n_sample} completed !!"
+	if [ `ls -A $sample/seacells_$proportion | wc -l` -eq 0 ]
+	then
+		python3 $WRAPPER_PATH -i $sample -a $ANNOTATION_FILE_PATH -o $sample/seacells_$proportion -p $prefix -r $proportion -m $min_gene
+		echo "$i/${n_sample} completed !!"
+	else
+		echo "$i/${n_sample} completed !!"
+	fi
 	let i=i+1
 done
 

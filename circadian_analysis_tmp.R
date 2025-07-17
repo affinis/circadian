@@ -2730,23 +2730,37 @@ ggplot(cd14monolyz)+geom_point(aes(x=LYZ,y=meta.cell.size))
 
 
 # try to filter background noise
-AllJTKresult.filtered<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.rds")
-AllJTKresult.filtered<-AllJTKresult.filtered[AllJTKresult.filtered$fold_to_background>=1.3&AllJTKresult.filtered$cor_to_batch<0.2,]
+AllJTKresult.filtered<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.bytype.0.08.rds")
+AllJTKresult.filtered[is.na(AllJTKresult.filtered$cor_to_batch),"cor_to_batch"]=0
+AllJTKresult.filtered<-AllJTKresult.filtered[AllJTKresult.filtered$fold_to_background>=2&AllJTKresult.filtered$cor_to_batch<0.2,]
+#AllJTKresult.filtered<-AllJTKresult.filtered[AllJTKresult.filtered$cor_to_batch<0.2,]
 AllJTKresult.filtered<-AllJTKresult.filtered[!is.na(AllJTKresult.filtered$celltype) & !is.na(AllJTKresult.filtered$individual), ]
 nrow(AllJTKresult.filtered)
 ggplot(AllJTKresult.filtered)+geom_bar(aes(x=LAG,fill=celltype))+
-  facet_grid(rows = vars(celltype), cols = vars(individual), drop = FALSE,space = "free_x",scale="free_y")
+  facet_grid(rows = vars(celltype), cols = vars(individual),
+             drop = FALSE,space = "free_x",scale="free_y")
+plotCountOscilattingByMetaCelltype(AllJTKresult.filtered)
+plotOscillatingGeneSummarise(AllJTKresult.filtered)
 plotPeakAmongIndividuals(AllJTKresult.filtered,"DDIT4")
-plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "PER2")
+plotPeakAmongIndividuals(AllJTKresult.filtered,"NR1D2")
 plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "PER2",layer = "data")
+plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "NR1D2",layer = "data",float.alpha = 0.1)
 
 
 plotEnrichGObyCT(AllJTKresult.filtered,type = "CD14 Mono")
 
-metacell2srt("/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell.0.08/",out.rds.path='../R/seacell.0.08.rds')
-
-srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.rds')
+metacell2srt("/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell_byType.0.08/",
+             out.rds.path='/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds',
+             std.cellranger.out = F,empty.drop.mode = F)
+metacell2srt("/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell_EmptyDrop.0.03/",
+             out.rds.path='/tmpdata/LyuLin/analysis/circadian/R/seacell.droplet.0.03.rds',
+             std.cellranger.out = F,empty.drop.mode = T)
+srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds')
 DimPlot(srt.metacell,group.by = "predicted.celltype.l2.main",label = T)
 plotExpressionWithSoup(srt.metacell,srt.metacell.drop,target.feature = "LYZ")
 
-plotMetaCellByIndividual(srt.metacell,cell.type = "B intermediate",feature = "AIDA")
+plotMetaCellByIndividual(srt.metacell,cell.type = "NK",feature = "DDIT4",layer = "data")
+
+# showing expression of circadian genes
+DotPlot(test,CIRCADIAN_GENES_MAIN,group.by = "type")+scale_y_discrete(limits=rev(celltypes))+
+  theme(axis.text.x=element_text(angle=60,hjust=1))+ylab("")+xlab("")

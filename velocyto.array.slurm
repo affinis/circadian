@@ -33,4 +33,6 @@ fi
 
 ulimit -n 2048
 
-$VELOCYTO run -b $CR_OUTS/sample_filtered_feature_bc_matrix/barcodes.tsv -o $CR_OUTS/velocyto/ -m $MASK $CR_OUTS/sample_alignments.bam --samtools-memory 2048 $REF 
+$VELOCYTO run -b $CR_OUTS/sample_filtered_feature_bc_matrix/barcodes.tsv -o $CR_OUTS/velocyto/ -m $MASK $CR_OUTS/sample_alignments.bam --samtools-memory 2048 $REF
+
+gzip $CR_OUTS/sample_filtered_feature_bc_matrix/barcodes.tsv
