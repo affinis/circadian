@@ -625,7 +625,7 @@ dimplot_publication<-function(srt,group.by="seurat_clusters",colors=pal_d3(palet
   yintercetpt=min(embedings[,1])-2.5
   xintercept=min(embedings[,2])-2.5
   arrow_extends=ifelse(abs(yintercetpt)>abs(xintercept),abs(yintercetpt)*arrow_extend_ratio,abs(xintercept)*arrow_extend_ratio)
-  DimPlot(srt,group.by=group.by,reduction=reduction.name,label=label,raster=raster)+scale_color_manual(values=colors)+
+  DimPlot(srt,group.by=group.by,reduction=reduction.name,label=label,raster=raster,repel = T,label.size = 4)+scale_color_manual(values=colors)+
     geom_segment(aes(x=yintercetpt,xend=yintercetpt,y=xintercept,yend=xintercept+arrow_extends),
          arrow=arrow(length=unit(0.4,"cm"),type="closed",angle=15))+
     geom_segment(aes(x=yintercetpt,xend=yintercetpt+arrow_extends,y=xintercept,yend=xintercept),
@@ -648,7 +648,7 @@ generateColor<-function(n,rgb.max=1,rgb.min=0.1,seed=2015,col.dist.min=0.5,alpha
   set.seed(seed)
   details=data.frame(r=c(0,1),g=c(0,0),b=c(1,0))
   i=2
-  colors=c(rgb(0,0,1,alpha=alpha,maxColorValue = maxColorValue),rgb(1,0,0,alpha=alpha,maxColorValue=maxColorValue))
+  colors=c(rgb(0,0,0.8,alpha=alpha,maxColorValue = maxColorValue),rgb(0.8,0,0,alpha=alpha,maxColorValue=maxColorValue))
   j=1
   while(i<n){
     rgb=runif(3,min=rgb.min,max=rgb.max)

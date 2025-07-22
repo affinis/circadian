@@ -2494,7 +2494,7 @@ generateAnnotationFile(TNK.file = '7mixed.integrated.TNK.rds',B.file = '7mixed.i
                        cols = c("manual.level1","manual.level2","manual_NI"),
                        out.path = "cell.annotation.7mixed.integrated.tsv")
  
-annotation.meta<-read.delim('cell.annotation.7mixed.integrated.tsv',header = T)
+annotation.meta<-read.delim('/tmpdata/LyuLin/analysis/circadian/R/cell.annotation.7mixed.integrated.tsv',header = T)
 rownames(annotation.meta)<-annotation.meta$cell_id
 srt<-AddMetaData(srt,annotation.meta)
 srt$type<-srt$manual.level2
@@ -2555,31 +2555,34 @@ std_data <- data.frame(
   #Concentration = c(1000, 500, 250, 125, 62.5, 31.25, 15.63),  # Standard concentrations
   #OD = c(0.701, 1.078, 1.450, 1.735, 1.964, 2.200, 2.694)      # Corresponding OD values
   Concentration = c(1000, 500, 250, 125, 62.5, 31.25, 15.63, 0),
-  OD = c(0.738, 1.151, 1.686, 2.411, 2.968, 3.101, 3.264, 3.259) 
+  #OD = c(0.738, 1.151, 1.686, 2.411, 2.968, 3.101, 3.264, 3.259)
+  OD = c(0.78,1.23,1.793,2.374,2.834,3.199,3.175,3.42)
 )
 fit <- drm(OD ~ Concentration, data = std_data, fct = LL.4())
 summary(fit)
 
 all_melatonin_data<-NULL
 # Example unknown ODs
-unknown_ODs<-c(1.372, 1.295, 1.133, 1.208, 1.316, 1.338, 1.300) # KD
-unknown_ODs<-c(1.333, 1.219, 1.405, 1.335, 1.329, 1.382, 1.354) # WMY
-unknown_ODs<-c(1.255, 1.149, 1.270, 1.092, 1.228, 1.297, 1.221) # ZYR
-unknown_ODs1<-c(2.354, 2.138, 2.112, 2.107, 2.116, 2.224, 2.161) # LYH1
-unknown_ODs2<-c(2.482, 2.375, 2.431, 2.141, 2.404, 2.185, 2.088) # LYH2
-unknown_ODs<-(unknown_ODs1+unknown_ODs2)/2
-unknown_ODs1<-c(2.077, 2.207, 1.795, 1.979, 2.067, 2.589, 2.313) # JJC1
-unknown_ODs2<-c(2.583, 1.989, 2.027, 2.239, 2.097, 1.963, 2.234) # JJC2
-unknown_ODs<-(unknown_ODs1+unknown_ODs2)/2
+#unknown_ODs<-c(1.372, 1.295, 1.133, 1.208, 1.316, 1.338, 1.300) # KD
+#unknown_ODs<-c(1.333, 1.219, 1.405, 1.335, 1.329, 1.382, 1.354) # WMY
+#unknown_ODs<-c(1.255, 1.149, 1.270, 1.092, 1.228, 1.297, 1.221) # ZYR
+#unknown_ODs1<-c(2.354, 2.138, 2.112, 2.107, 2.116, 2.224, 2.161) # LYH1
+#unknown_ODs2<-c(2.482, 2.375, 2.431, 2.141, 2.404, 2.185, 2.088) # LYH2
+#unknown_ODs<-(unknown_ODs1+unknown_ODs2)/2
+#unknown_ODs1<-c(2.077, 2.207, 1.795, 1.979, 2.067, 2.589, 2.313) # JJC1
+#unknown_ODs2<-c(2.583, 1.989, 2.027, 2.239, 2.097, 1.963, 2.234) # JJC2
+#unknown_ODs<-(unknown_ODs1+unknown_ODs2)/2
 # Predict concentrations (inverse prediction)
+unknown_ODs<-c(2.405,2.66,2.302,2.574,2.671,2.653,2.576, # KD
+               2.593,2.616,2.496,2.603,2.518,2.708,2.662, # WMY
+               2.435,2.642,2.681,2.757,2.696,2.762,2.823, # ZYR
+               2.464,2.453,2.458,2.545,2.626,2.55,2.563, # LYH
+               2.379,2.733,2.749,2.852,2.758,2.706,2.71 # JJC
+)
 unknown_conc <- ED(fit, unknown_ODs, type = "absolute", display = FALSE)
 unknown_conc<-as.data.frame(unknown_conc)
-unknown_conc$CT<-c("CT11","CT15","CT19","CT23","CT27","CT31","CT35")
-unknown_conc$individual<-"KD"
-unknown_conc$individual<-"WMY"
-unknown_conc$individual<-"ZYR"
-unknown_conc$individual<-"LYH"
-unknown_conc$individual<-"JJC"
+unknown_conc$CT<-rep(c("CT11","CT15","CT19","CT23","CT27","CT31","CT35"),5)
+unknown_conc$individual<-c(rep("KD",7),rep("WMY",7),rep("ZYR",7),rep("LYH",7),rep("JJC",7))
 if(is.null(all_melatonin_data)){
   all_melatonin_data=unknown_conc
 }else{
@@ -2593,30 +2596,33 @@ all_melatonin_data<-all_melatonin_data %>% group_by(individual) %>% mutate(relat
 ggplot(all_melatonin_data)+geom_boxplot(aes(x=CT,y=relative_concentration))+
   geom_point(aes(x=CT,y=relative_concentration))+ylab("z-score")+
   ggtitle("z-score of melatonin")+theme(axis.text.x = element_text(angle=60,hjust=1))
-saveRDS(all_melatonin_data,"ELISA_melatonin.rds")
+saveRDS(all_melatonin_data,"ELISA_melatonin2.rds")
 ## cortisol data
 std_data <- data.frame(
   Concentration = c(400, 200, 100, 50, 25, 12.5, 6.25, 0),  # Standard concentrations
-  OD = c(0.079, 0.094, 0.107, 0.239, 0.368, 0.574, 0.736, 0.782)      # Corresponding OD values
+  OD = c(0.063,0.067,0.104,0.147,0.194,0.331,0.407,0.659)      # Corresponding OD values
 )
 fit <- drm(OD ~ Concentration, data = std_data, fct = LL.4())
 summary(fit)
 
 all_cortisol_data<-NULL
-unknown_ODs<-c(0.198, 0.229, 0.317, 0.357, 0.284, 0.302, 0.272) # KD
-unknown_ODs<-c(0.157, 0.253, 0.258, 0.227, 0.231, 0.204, 0.196) # WMY
-unknown_ODs<-c(0.200, 0.199, 0.214, 0.269, 0.183, 0.188, 0.278) # ZYR
-unknown_ODs<-c(0.440, 0.400, 0.531, 0.675, 0.351, 0.428, 0.344) # LYH
-unknown_ODs<-c(0.088, 0.097, 0.132, 0.105, 0.130, 0.084, 0.087) # JJC
+#unknown_ODs<-c(0.198, 0.229, 0.317, 0.357, 0.284, 0.302, 0.272) # KD
+#unknown_ODs<-c(0.157, 0.253, 0.258, 0.227, 0.231, 0.204, 0.196) # WMY
+#unknown_ODs<-c(0.200, 0.199, 0.214, 0.269, 0.183, 0.188, 0.278) # ZYR
+#unknown_ODs<-c(0.440, 0.400, 0.531, 0.675, 0.351, 0.428, 0.344) # LYH
+#unknown_ODs<-c(0.088, 0.097, 0.132, 0.105, 0.130, 0.084, 0.087) # JJC
+
+unknown_ODs<-c(0.092,0.115,0.117,0.121,0.118,0.154,0.119, # KD
+               0.091,0.098,0.053,0.106,0.115,0.105,0.104, # WMY
+               0.105,0.117,0.104,0.121,0.114,0.115,0.139, # ZYR
+               0.099,0.128,0.189,0.154,0.138,0.128,0.119, # LYH
+               0.059,0.061,0.067,0.069,0.07,0.064,0.073   # JJC
+)
 
 unknown_conc <- ED(fit, unknown_ODs, type = "absolute", display = FALSE)
 unknown_conc<-as.data.frame(unknown_conc)
-unknown_conc$CT<-c("CT11","CT15","CT19","CT23","CT27","CT31","CT35")
-unknown_conc$individual<-"KD"
-unknown_conc$individual<-"WMY"
-unknown_conc$individual<-"ZYR"
-unknown_conc$individual<-"LYH"
-unknown_conc$individual<-"JJC"
+unknown_conc$CT<-rep(c("CT11","CT15","CT19","CT23","CT27","CT31","CT35"),5)
+unknown_conc$individual<-c(rep("KD",7),rep("WMY",7),rep("ZYR",7),rep("LYH",7),rep("JJC",7))
 if(is.null(all_cortisol_data)){
   all_cortisol_data=unknown_conc
 }else{
@@ -2630,7 +2636,7 @@ all_cortisol_data<-all_cortisol_data %>% group_by(individual) %>% mutate(relativ
 ggplot(all_cortisol_data)+geom_boxplot(aes(x=CT,y=relative_concentration))+
   geom_point(aes(x=CT,y=relative_concentration))+ylab("z-score")+
   ggtitle("z-score of cortisol")+theme(axis.text.x = element_text(angle=60,hjust=1))
-saveRDS(all_cortisol_data,"ELISA_cortisol.rds")
+saveRDS(all_cortisol_data,"ELISA_cortisol2.rds")
 
 # analyse metacell result
 AllJTKresult<-readJTKFromMetaCells('/tmpdata/LyuLin/analysis/circadian/R/seacell.meta2d.0.04')
@@ -2759,8 +2765,58 @@ srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.
 DimPlot(srt.metacell,group.by = "predicted.celltype.l2.main",label = T)
 plotExpressionWithSoup(srt.metacell,srt.metacell.drop,target.feature = "LYZ")
 
-plotMetaCellByIndividual(srt.metacell,cell.type = "NK",feature = "DDIT4",layer = "data")
+plotMetaCellByIndividual(srt.metacell,cell.type = "CD14 Mono",feature = "BMAL1",layer = "data")
 
 # showing expression of circadian genes
 DotPlot(test,CIRCADIAN_GENES_MAIN,group.by = "type")+scale_y_discrete(limits=rev(celltypes))+
   theme(axis.text.x=element_text(angle=60,hjust=1))+ylab("")+xlab("")
+
+# compare metacell proportion 0.08 0.04 0.03
+plotdata=NULL
+for (proportion in c(0.03,0.04,0.08)) {
+  AllJTKresult.filtered=readRDS(paste0("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.bytype.",proportion,".rds"))
+  AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$fold_to_background>=2&AllJTKresult.filtered$cor_to_batch<0.2,]
+  #AllJTKresult.filtered<-AllJTKresult.filtered[AllJTKresult.filtered$cor_to_batch<0.2,]
+  AllJTKresult.filtered<-AllJTKresult.filtered[!is.na(AllJTKresult.filtered$celltype) & !is.na(AllJTKresult.filtered$individual), ]
+  this.plotdata=AllJTKresult.filtered %>% group_by(celltype) %>% summarise(n.gene.found=n())
+  this.plotdata$ratio.shrink=proportion
+  if(is.null(plotdata)){
+    plotdata=this.plotdata
+  }else{
+    plotdata=rbind(plotdata,this.plotdata)
+  }
+}
+plotdata$ratio.shrink<-as.factor(plotdata$ratio.shrink)
+plotdata$meta.cell.size<-case_when(plotdata$ratio.shrink==0.03~30,
+                                   plotdata$ratio.shrink==0.04~20,
+                                   plotdata$ratio.shrink==0.08~10)
+plotdata$meta.cell.size<-as.factor(plotdata$meta.cell.size)
+plotdata$celltype<-factor(plotdata$celltype,levels=unique(plotdata$celltype))
+ggplot(plotdata)+geom_bar(aes(x=celltype,y=n.gene.found,fill=meta.cell.size),color="black",
+                          position=position_dodge2(width = 2,preserve = "single"),stat="identity")+
+  scale_y_continuous(expand = c(0,0))+scale_fill_aaas()+xlab("")+
+  ggtitle("number of circadian genes found\nunder different metacell size")+
+  theme_minimal()+theme(axis.text.x=element_text(angle = 60,hjust=1),plot.title=element_text(hjust = 0.5))
+
+srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds')
+JTK.0.08.clean<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.bytype.0.08.rds')
+plotMetaCellByIndividual(srt.metacell,"CD14 Mono","ABHD6","data")
+srt.metacell.KD.CD14_Mono<-subset(srt.metacell,subset=predicted.celltype.l2.main=="CD14 Mono"&individual=="KD")
+srt.metacell.KD.CD14_Mono<-NormalizeData(srt.metacell.KD.CD14_Mono)
+circadian_features=scan('../python/KD_CD14-Mono.OSgene.lst',what = "character")
+circadian_features=scan('../python/CD14-Mono.universal.OSgene.lst',what = "character")
+srt.metacell.KD.CD14_Mono<-RunPCA(srt.metacell.KD.CD14_Mono,features = circadian_features)
+srt.metacell.KD.CD14_Mono<-RunUMAP(srt.metacell.KD.CD14_Mono,reduction = "pca",dims = 1:20)
+DimPlot(srt.metacell.KD.CD14_Mono,group.by = 'CT',reduction = "pca")
+DimPlot(srt.metacell.KD.CD14_Mono,group.by = 'CT',reduction = "umap",split.by = 'CT')
+
+srt.metacell.JJC.CD14_Mono<-subset(srt.metacell,subset=predicted.celltype.l2.main=="CD14 Mono"&individual=="JJC")
+srt.metacell.JJC.CD14_Mono<-NormalizeData(srt.metacell.JJC.CD14_Mono)
+circadian_features=scan('../python/JJC_CD14-Mono.OSgene.lst',what = "character")
+circadian_features=scan('../python/CD14-Mono.universal.OSgene.lst',what = "character")
+srt.metacell.JJC.CD14_Mono<-RunPCA(srt.metacell.JJC.CD14_Mono,features = circadian_features)
+srt.metacell.JJC.CD14_Mono<-RunUMAP(srt.metacell.JJC.CD14_Mono,reduction = "pca",dims = 1:20)
+
+DimPlot(srt.metacell.JJC.CD14_Mono,reduction = "umap",split.by = 'CT',group.by = 'CT')
+
+

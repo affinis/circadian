@@ -15,7 +15,7 @@ calculateCorBatch<-function(arg.type,arg.feature,mat){
   this.batch.data=data.frame("feature"=rep(arg.feature,length(this.cor)),"type"=rep(arg.type,length(this.cor)),"cor"=this.cor)
   return(this.batch.data)
 }
-AllJTKresult.filtered<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.bytype.0.04.rds")
+AllJTKresult.filtered<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.bytype.0.03.rds")
 
 matBySample.nr<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/matBySample.rds')
 
@@ -35,4 +35,4 @@ for (i in 1:nrow(AllJTKresult.filtered)) {
   }
 }
 
-saveRDS(AllJTKresult.filtered,"/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.bytype.0.04.rds")
+saveRDS(AllJTKresult.filtered,"/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.bytype.0.03.rds")
