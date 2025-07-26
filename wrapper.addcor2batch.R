@@ -7,13 +7,20 @@ source('/tmpdata/LyuLin/script/circadian/circadian_core.R')
 ##
 # speed: 36000 rows elapsed about 3.5 hours
 
-calculateCorBatch<-function(arg.type,arg.feature,mat){
-  this.data=dplyr::filter(mat,feature==arg.feature,type==arg.type)[c("batch","individual","count")] %>% spread(key="individual",value="count")
-  this.data=column_to_rownames(this.data,"batch")
-  #print(cor(this.data))
-  this.cor=cor(this.data)[upper.tri(cor(this.data), diag = FALSE)]
-  this.batch.data=data.frame("feature"=rep(arg.feature,length(this.cor)),"type"=rep(arg.type,length(this.cor)),"cor"=this.cor)
-  return(this.batch.data)
+calculateCorBatch<-function(arg.type,arg.feature,mat,pooled.mode=T){
+  if(pooled.mode){
+    this.data=dplyr::filter(mat,feature==arg.feature,type==arg.type)[c("batch","individual","count")] %>% spread(key="individual",value="count")
+    this.data=column_to_rownames(this.data,"batch")
+    #print(cor(this.data))
+    this.cor=cor(this.data)[upper.tri(cor(this.data), diag = FALSE)]
+    this.batch.data=data.frame("feature"=rep(arg.feature,length(this.cor)),"type"=rep(arg.type,length(this.cor)),"cor"=this.cor)
+    return(this.batch.data)
+  }else{
+    test.data=dplyr::filter(mat,feature==arg.feature,type==arg.type)[c("batch","individual","count")]
+    test.data2=mat %>% group_by(batch) %>% summarise(total_count=sum(count))
+    this.cor=cor(left_join(test.data,test.data2)$count,left_join(test.data,test.data2)$total_count)
+    return(this.cor)
+  }
 }
 AllJTKresult.filtered<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.bytype.0.03.rds")
 

@@ -3,11 +3,10 @@
 
 library(Seurat)
 library(SeuratObject)
-# remotes::install_github("satijalab/seurat-data", quiet = TRUE)
+# remotes::install_github("satijalab/seurat-data")
 library(SeuratData)
 # remotes::install_github("mojaveazure/seurat-disk")
 library(SeuratDisk)
-library(devtools)
 library(anndata)
 library(org.Hs.eg.db)
 library(biomaRt)
@@ -21,36 +20,36 @@ library(groupdata2)
 library(RColorBrewer)
 library(MetaCycle)
 # remotes::install_github("satijalab/azimuth", quiet = TRUE)
-library(Azimuth)
+#library(Azimuth)
 library(vegan)
 library(doParallel)
 library(foreach)
-library(clusterProfiler)
-library(destiny)
+#library(clusterProfiler)
+#library(destiny)
 library(ggcorrplot)
 # devtools::install_github("micnngo/tauFisher", build_vignettes = TRUE) 
 library(tauFisher)
 library(VennDiagram)
-library(grid)
 library(shazam)
-library(dowser)
+#library(dowser)
 library(scoper)
 library(alakazam)
-library(DESeq2)
-library(ReactomePA)
+#library(DESeq2)
+#library(ReactomePA)
 library(ggrepel)
 library(tidygraph)
 library(ggraph)
 # devtools::install_github("ricardo-bion/ggradar", dependencies = TRUE)
 library(ggradar)
-library(topGO)
-library(dorothea)
+#library(topGO)
+#library(dorothea)
 # remotes::install_github('chris-mcginnis-ucsf/DoubletFinder', force = TRUE)
-library(DoubletFinder)
+#library(DoubletFinder)
 # drc used to analyse ELISA data
 library(drc)
+library(ggpubr)
 
-SCRIPTS<-"/tmpdata/LyuLin/script/wrapper_script"
+SCRIPTS<-"/tmpdata/LyuLin/script/wrapper_script/"
 source(paste(SCRIPTS,"seuratWrapper.R",sep="/"))
 source(paste(SCRIPTS,"seuratIntegrateWrapper.R",sep="/"))
 source('/tmpdata/LyuLin/script/circadian/ggplot2_core.R')
@@ -59,7 +58,7 @@ source('/tmpdata/LyuLin/script/circadian/ggplot2_core.R')
 # GLOBAL VARs/SETTINGs
 #:::::::::::::::::::::#
 
-setwd('/tmpdata/LyuLin/analysis/circadian/cellranger')
+setwd('/tmpdata/LyuLin/analysis/circadian/cellranger/')
 HOME='/tmpdata/LyuLin/analysis/circadian/cellranger'
 #INTERNAL_CONTROL<-c("CDK4")
 INTERNAL_CONTROL<-c("ACTB","GAPDH","B2M","RPLP0","TBP","HPRT1","PPIA")
@@ -128,6 +127,7 @@ BATCH_LYH<-c("X5_250424MIX05"="CT11","X5_250409MIX01"="CT15","X5_250424MIX07"="C
 BATCH_KD<-c("X5_250424MIX06"="CT11","X5_250409MIX01"="CT15","X5_250424MIX07"="CT19","X5_250424MIX03"="CT23","X5_250424MIX05"="CT27","X5_250424MIX04"="CT31","X5_250424MIX02"="CT35")
 BATCH_ZYR<-c("X5_250424MIX04"="CT11","X5_250409MIX01"="CT15","X5_250424MIX07"="CT19","X5_250424MIX03"="CT23","X5_250424MIX02"="CT27","X5_250424MIX05"="CT31","X5_250424MIX06"="CT35")
 
+
 #::::::::: ::::#
 # I/O FUNCTIONS
 #:::::::::: :::#
@@ -140,41 +140,27 @@ BATCH_ZYR<-c("X5_250424MIX04"="CT11","X5_250409MIX01"="CT15","X5_250424MIX07"="C
 # upstream: <slurm>runSeaCells.slurm
 # downstream: <Rscript>wrapper.testRhythmicity.R, plotMetaCellByIndividual
 # dependency: NSF
-# caller: NSF
-readAllMetaCell<-function(file.path,std.cellranger.out=T,empty.drop.mode=F){
-  if(std.cellranger.out){
-    samples=PATIENTS %>% lapply(.,paste0,"_",1:6) %>% unlist()
-  }else{
-    samples=system(paste0('find ',file.path,' -name "*_metacells.csv"'),intern = T)
-  }
+# caller: metacell2srt
+readAllMetaCell<-function(file.path,proportion,empty.drop.mode=F){
+  samples=system(paste0('find ',file.path,' -name "*_metacells.csv" | grep ',proportion),intern = T)
   mat_c=NULL
   meta_c=NULL
   i=1
   for (sample in samples) {
     mat=NULL
     meta.path=NULL
-    if(std.cellranger.out){
-      prefix=paste0(getField(sample,"_",c(1,2)),"_",CT_TIME[as.numeric(getField(sample,"_",3))])
-      mat.path=paste0(file.path,sample,"/outs/per_sample_outs/",sample,"/count/seacells/",prefix,"_metacells.csv")
-      if(!file.exists(mat.path)){
-        next
-      }
-      mat=read.csv(mat.path)
-    }else{
-      prefix=paste0("TF_",getField(basename(sample),"_",c(1,2)))
-      mat=read.csv(sample)
+    if(grepl("CD56bright",sample)){
+      prefix=paste0("TF_",getField(basename(sample),"_",c(1,2,3,4)))
+     }else{
+      prefix=paste0("TF_",getField(basename(sample),"_",c(1,2,3)))
     }
-    
+    mat=read.csv(sample)
+
+    # modify cell_id in metacell.csv
     colnames(mat)=gsub(".","-",colnames(mat),fixed = T)
-    colnames(mat)[-1]=paste0(prefix,"_",colnames(mat)[-1]) %>% gsub("$",i,.)
+    colnames(mat)[-1]=paste0(prefix,"_",colnames(mat)[-1])
     #print(head(mat[1:5,1:5]))
-    
-    if(std.cellranger.out){
-      meta.path=paste0(file.path,sample,"/outs/per_sample_outs/",sample,"/count/seacells/",prefix,"_metadata.csv")
-    }else{
-      meta.path=gsub("metacells","metadata",sample)
-    }
-    
+    meta.path=gsub("metacells","metadata",sample)
     meta=read.csv(meta.path)
     rownames(meta)=meta$index
     meta$index=NULL
@@ -200,7 +186,7 @@ readAllMetaCell<-function(file.path,std.cellranger.out=T,empty.drop.mode=F){
     # must as.data.frame, because we need to add rownames, which will be used when using AddMetaData in pkg Seurat
     # if not, annotations will be randomly assigned to each cell 
     meta.suma=as.data.frame(meta.suma)
-    rownames(meta.suma)=meta.suma$SEACell %>% gsub("$",i,.)
+    rownames(meta.suma)=meta.suma$SEACell
     meta.suma$SEACell=NULL
     #print(head(meta.suma[1:3,]))
     
@@ -221,7 +207,7 @@ readAllMetaCell<-function(file.path,std.cellranger.out=T,empty.drop.mode=F){
     #srt=AddMetaData(srt,meta.suma)
     #return(srt)
     i=i+1
-    if(i%%10==0){
+    if(i%%100==0){
       message(paste0(i,"/",length(samples)))
     }
   }
@@ -230,11 +216,13 @@ readAllMetaCell<-function(file.path,std.cellranger.out=T,empty.drop.mode=F){
   mat_c$X=NULL
   mat_c[is.na(mat_c)]=0
   print(mat_c[1:3,1:3])
+  assign("runtime.readAllMetaCell.mat_c",mat_c,envir = .GlobalEnv)
   srt=CreateSeuratObject(mat_c)
-  if(!std.cellranger.out){
-    rownames(meta_c)=gsub("filtered_bc_matrix_","",rownames(meta_c)) %>% gsub("^","TF_",.)
-  }
+
+  rownames(meta_c)=gsub("filtered_bc_matrix_","",rownames(meta_c)) %>% gsub("^","TF_",.)
+
   print(meta_c[1:3,1:3])
+  assign("runtime.readAllMetaCell.meta_c",meta_c,envir = .GlobalEnv)
   srt=AddMetaData(srt,meta_c)
   srt$type=srt$predicted.celltype.l2.main
   if(!empty.drop.mode){
@@ -1325,7 +1313,7 @@ plotRhythmicityPvalue<-function(celltypes,p.cutoff=1,features=CIRCADIAN_GENES_MA
 # upstream: readAllMetaCell, metacell2srt
 # dependency: fetchMergedDataOneCellType, getField
 # caller: NSF
-plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dist=T,droplet.mode=F,float.alpha=0.25,metacell.mode=T){
+plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dist=T,droplet.mode=F,float.alpha=0.25,metacell.mode=T,internal_control="nCount_RNA"){
   data=fetchMergedDataOneCellType(srt,cell.type=cell.type,gene.list=feature,CT_field=3,patient_filed = c(1,2),layer=layer,filter_data=F)
   if(droplet.mode){
     data$time=as.vector(srt$CT[data$observation])
@@ -1334,13 +1322,15 @@ plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dis
   if(metacell.mode){
     control=srt[["meta.cell.size"]] %>% as.data.frame()
   }else{
-    control=srt[["nCount_RNA"]] %>% as.data.frame()
+    control=LayerData(srt,layer = "count",feature="CDK4") %>% as.data.frame() %>% t %>% as.data.frame()
+    colnames(control)[1]="control_expression"
   }
   control=rownames_to_column(control,var = "observations")
   colnames(control)[2]="control_expression"
-  print(head(data))
-  print(head(control))
+  #print(head(data))
+  #print(head(control))
   data=left_join(data,control)
+  data=data[data$control_expression!=0,]
   #data$normalized=data$values/data$control_expression
   data$normalized=data$values/data$control_expression
   data=data %>% group_by(time,patient) %>% mutate(mean_expression=mean(log(normalized+1))) %>% group_by(patient) %>%
@@ -1351,29 +1341,16 @@ plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dis
                        relative_median=median(relative_expression))
   print(head(data))
   if(layer=="data"){
-    ggplot(data)+geom_boxplot(aes(x=time,y=values))+
+    ggplot(data)+geom_boxplot(aes(x=time,y=values),outlier.alpha=0)+
       geom_jitter(aes(x=time,y=values),alpha=float.alpha)+facet_wrap(~patient,scale="free_y",ncol=4)+
       ggtitle(paste0(cell.type,": ",feature))+theme_bw()+theme(axis.text.x=element_text(angle=60,hjust=1))+
       ylab("normalized expression")
   }else{
-    ggplot(data)+geom_boxplot(aes(x=time,y=normalized))+
+      ggplot(data)+geom_boxplot(aes(x=time,y=normalized),outlier.alpha=0)+
       geom_jitter(aes(x=time,y=normalized),alpha=float.alpha)+facet_wrap(~patient,scale="free_y",ncol=4)+
       ggtitle(paste0(cell.type,": ",feature))+theme_bw()+theme(axis.text.x=element_text(angle=60,hjust=1))+
       ylab("normalized expression")
   }
-
-  #if(norm.dist){
-  #  ggplot(data)+geom_point(aes(x=time,y=mean_relative))+
-  #    geom_point(aes(x=time,y=relative_expression))+
-  #    geom_line(aes(x=time,y=mean_relative,group=features))+
-  #    geom_errorbar(aes(x=time,ymin=mean_relative-sd_relative,ymax=mean_relative+sd_relative),width=0.2)+
-  #    ggtitle(paste0(cell.type,": ",feature))
-  #}else{
-  #  ggplot(data)+geom_point(aes(x=time,y=relative_median))+
-  #    geom_line(aes(x=time,y=relative_median,group=features))+
-  #    geom_errorbar(aes(x=time,ymin=relative_q25,ymax=relative_q75),width=0.2)+
-  #    ggtitle(paste0(cell.type,": ",feature))
-  #}
 }
 
 plotPseudobulkByCTByIndividual<-function(srt,cell.type,features,individuals=NULL,normalize.data=F,time.points=CT_TIME_ORDER,
@@ -2297,10 +2274,9 @@ cateSub<-function(vector,categories.ori,categories.nov){
 
 # Function: srt2bulkMatrix
 # convert srt object to pseudo-bulk matrix, can split by up to 3 meta.data
-## free function
 # upstream: NSF
 # downstream: NSF
-# caller: NSF
+# caller: generateCircadianMatBySample
 # dependency: NSF
 srt2bulkMatrix<-function(srt,split.by,layer="count",normalize=F){
   res=NULL
@@ -2623,11 +2599,11 @@ plotPeakAmongIndividuals<-function(JTKresult,gene,float.barlength=0.1){
 # downstream: NSF
 # caller: NSF
 # dependency: NSF
-plotOscillatingGeneSummarise<-function(JTKresult){
+plotOscillatingGeneSummarise<-function(JTKresult,vec.plottype=NULL){
   allplotdata=NULL
   for(celltype in unique(JTKresult$celltype)){
     n.ocurrence.suma=JTKresult[JTKresult$celltype==celltype,] %>% group_by(CycID) %>% summarise(n.ocurrence=n(),minus.log.adjp=median(-log10(ADJ.P)),amp=median(AMP))
-    print(head(n.ocurrence.suma))
+    #print(head(n.ocurrence.suma))
     plotdata=n.ocurrence.suma
     plotdata$celltype=celltype
     if(is.null(allplotdata)){
@@ -2636,11 +2612,15 @@ plotOscillatingGeneSummarise<-function(JTKresult){
       allplotdata=rbind(allplotdata,plotdata)
     }
   }
-
+  allplotdata=allplotdata[!is.na(allplotdata$CycID),]
+  assign("runtime.plotOscillatingGeneSummarise.allplotdata",allplotdata,envir = .GlobalEnv)
+  if(!is.null(vec.plottype)){
+    allplotdata=allplotdata[allplotdata$celltype %in% vec.plottype,]
+  }
   ggplot(allplotdata)+geom_point(aes(x=amp,y=minus.log.adjp,size=n.ocurrence,color=celltype),alpha=0.7)+
     facet_wrap(~celltype,scales="free")+
-    geom_text_repel(data = allplotdata[allplotdata$n.ocurrence>=2,],aes(x=amp,y=minus.log.adjp,label=CycID),hjust=1,vjust=1)+
-    scale_color_manual(values=generateColor(length(unique(JTKresult$celltype))))+labs(x="peaking expression",y="-log10(p.adj)")+
+    geom_text_repel(data = allplotdata[allplotdata$n.ocurrence>6,],aes(x=amp,y=minus.log.adjp,label=CycID),hjust=1,vjust=1)+
+    scale_color_manual(values=generateColor(length(unique(allplotdata$celltype))))+labs(x="peaking expression",y="-log10(p.adj)")+
     theme_minimal(base_size = 12)+theme(strip.text = element_text(size = 12))
 }
 
@@ -2775,8 +2755,9 @@ metacell2srt<-function(meta.cell.path,out.rds.path,std.cellranger.out=F,empty.dr
   if(!empty.drop.mode){
     srt.metacell$sample=paste0(srt.metacell$individual,"_",srt.metacell$CT)
   }
-  srt.metacell=subset(srt.metacell,predicted.celltype.l2.purity>=0.90)
-  srt.metacell=integrateSubset(srt.metacell,k.weight = 50)
+  assign("runtime.metacell2srt.srt.metacell",srt.metacell,envir=.GlobalEnv)
+  #srt.metacell=subset(srt.metacell,predicted.celltype.l2.purity>=0.90)
+  srt.metacell=integrateSubset(srt.metacell,k.weight = 35)
   saveRDS(srt.metacell,out.rds.path)
 }
 
@@ -2794,4 +2775,77 @@ plotRawCountFeatures<-function(srt,vector.feature,group.by="type"){
   annotation=srt@meta.data["type"]
   annotation=rownames_to_column(annotation,"observation")
   count.mat=left_join(count.mat,annotation)
+}
+
+# plotCellRangerReports
+# sample.dir: a directory containing multiple cellranger outputs
+# metric.name: data you want to view, available: Cells, Mean reads per cell, Median UMI counts per cell, 
+#                                                Number of reads, Sequencing saturation
+##
+# upsteam: cellranger multi
+# downstream: NSF
+# caller: NSF
+# dependency: getField
+plotCellRangerReports<-function(sample.dir,str.metric.name,vec.color=pal_aaas()(8)){
+  alldata=NULL
+  summaries=system(paste0('find ',sample.dir,' -name "metrics_summary.csv"'),intern = T)
+  for(summary in summaries){
+    this.table=read.csv(summary)
+    sample_id=getField(summary,'per_sample_outs/',2) %>% getField(.,'/',1)
+    this.table$Sample.ID=sample_id
+    if(is.null(alldata)){
+      alldata=this.table
+    }else{
+      alldata=rbind(alldata,this.table)
+    }
+  }
+  alldata$Metric.Numeric=alldata$Metric.Value %>% gsub(",","",.) %>% gsub("%","",.) %>% as.numeric()
+  alldata$Batch=ifelse(grepl("MIX",alldata$Sample.ID),"pooled_sample","regular_sample")
+  alldata=alldata[alldata$Grouped.By!="",]
+  #return(alldata)
+  if(str.metric.name=="Number of reads"){
+    ggplot(alldata[alldata$Metric.Name=="Number of reads",])+
+      geom_bar(aes(x=Sample.ID,y=Metric.Numeric,fill=Batch),stat="identity")+
+      scale_y_continuous(labels = scales::comma)+facet_wrap(~Library.Type,nrow=3,scales = "free_y")+
+      theme_bw()+theme(axis.text.x=element_text(angle=60,hjust=1,size=7.5,color="black"))+
+      ylab("Number of reads")+scale_fill_manual(values=vec.color)
+  }else if(str.metric.name=="Cells"){
+    regular=ggplot(alldata[alldata$Metric.Name%in%c("Cells","VDJ Cells")&alldata$Batch=="regular_sample",])+
+      geom_bar(aes(x=Sample.ID,y=Metric.Numeric,fill=Batch),stat="identity")+
+      geom_text(aes(x=Sample.ID,y=Metric.Numeric/2,label=Metric.Numeric),angle=90,hjust=0.5)+
+      scale_y_continuous(labels = scales::comma)+facet_wrap(~Library.Type,nrow=3,scales = "free_y")+
+      theme_bw()+theme(axis.text.x=element_text(angle=60,hjust=1,size=7.5,color="black"))+
+      ylab("Number of cells")+scale_fill_manual(values=vec.color[1])
+    pool=ggplot(alldata[alldata$Metric.Name%in%c("Cells","VDJ Cells")&alldata$Batch=="pooled_sample",])+
+      geom_bar(aes(x=Sample.ID,y=Metric.Numeric,fill=Batch),stat="identity")+
+      geom_text(aes(x=Sample.ID,y=Metric.Numeric/2,label=Metric.Numeric),angle=90,hjust=0.5)+
+      scale_y_continuous(labels = scales::comma)+facet_wrap(~Library.Type,nrow=3,scales = "free_y")+
+      theme_bw()+theme(axis.text.x=element_text(angle=60,hjust=1,size=7.5,color="black"))+
+      ylab("Number of cells")+scale_fill_manual(values=vec.color[2])
+    ggarrange(regular,pool,ncol=2,widths=c(6,1),align = "hv",common.legend = T)
+  }
+}
+
+# generateCircadianMatBySample
+# upstream: readAllMetaCell
+# downstream: wrapper.addcor2batch.R
+# caller: NSF
+# dependency: srt2bulkMatrix
+generateCircadianMatBySample<-function(srt.metacell,out.file,pooled.sample=F){
+  srt.metacell$type=srt.metacell$predicted.celltype.l2.main
+  matBySample=srt2bulkMatrix(srt.metacell,c("individual","CT","type"),layer = "data",normalize = T)
+  assign("runtime.generateCircadianMatBySample.matBySample",matBySample,envir=.GlobalEnv)
+  matBySample=rownames_to_column(matBySample,"feature")
+  matBySample.nr=matBySample %>% gather(key="key",value="count",-feature)
+  matBySample.nr$individual=getField(matBySample.nr$key,"-",1)
+  matBySample.nr$CT=getField(matBySample.nr$key,"-",2)
+  matBySample.nr$type=getField(matBySample.nr$key,"-",3)
+  matBySample.nr$key=getField(matBySample.nr$key,"-",c(1,2))
+  if(pooled.sample){
+    matBySample.nr$batch=BATCH[matBySample.nr$key]
+  }else{
+    matBySample.nr$batch=paste0(matBySample.nr$individual,"_",matBySample.nr$CT)
+  }
+  matBySample.nr[is.na(matBySample.nr$count),"count"]=0
+  saveRDS(matBySample.nr,out.file)
 }

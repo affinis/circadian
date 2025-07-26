@@ -23,6 +23,7 @@ if(!file.exists("/tmpdata/LyuLin/analysis/circadian/R/seacell.0.03.bytype.rds"))
 
 srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.03.bytype.rds')
 
+srt.metacell<-NormalizeData(srt.metacell,normalization.method = "RC",scale.factor = 1000000)
 mat<-as.data.frame(LayerData(srt.metacell,layer = "data"))
 
 mat<-rownames_to_column(mat,"feature")

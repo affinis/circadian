@@ -7,12 +7,12 @@ source('/tmpdata/LyuLin/script/circadian/circadian_core.R')
 ##
 # speed: 36000 rows elapsed about 1 hours
 
-droplets<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.droplet.0.03.rds')
-metacells<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.03.bytype.rds')
+droplets<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.droplet.0.08.rds')
+metacells<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.NineHealthy.rds')
 
-AllJTKresult<-readJTKFromMetaCells('/tmpdata/LyuLin/analysis/circadian/R/seacell.meta2d.0.03.bytype')
+AllJTKresult<-readJTKFromMetaCells('/tmpdata/LyuLin/analysis/circadian/R/seacell.meta2d.0.08.NineHealthy.bytype/')
 AllJTKresult.filtered<-filter(AllJTKresult,ADJ.P<0.05,PER>=20,PER<=28)
-saveRDS(AllJTKresult.filtered,'/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.bytype.0.03.rds')
+saveRDS(AllJTKresult.filtered,'/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.bytype.0.08.NineHealthy.rds')
 
 droplet.mat<-LayerData(droplets,layer="count")
 metacell.mat<-LayerData(metacells,layer="count")
@@ -55,4 +55,4 @@ for(i in 1:nrow(AllJTKresult.filtered)){
 }
 
 #AllJTKresult.filtered$padj_to_background<-p.adjust(AllJTKresult.filtered$p_to_background, method = "BH")
-saveRDS(AllJTKresult.filtered,"/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.bytype.0.03.rds")
+saveRDS(AllJTKresult.filtered,"/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.bytype.0.08.NineHealthy.rds")

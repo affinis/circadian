@@ -2799,7 +2799,7 @@ ggplot(plotdata)+geom_bar(aes(x=celltype,y=n.gene.found,fill=meta.cell.size),col
   theme_minimal()+theme(axis.text.x=element_text(angle = 60,hjust=1),plot.title=element_text(hjust = 0.5))
 
 srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds')
-JTK.0.08.clean<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.bytype.0.08.rds')
+sJTK.0.08.clean<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.bytype.0.08.rds')
 plotMetaCellByIndividual(srt.metacell,"CD14 Mono","ABHD6","data")
 srt.metacell.KD.CD14_Mono<-subset(srt.metacell,subset=predicted.celltype.l2.main=="CD14 Mono"&individual=="KD")
 srt.metacell.KD.CD14_Mono<-NormalizeData(srt.metacell.KD.CD14_Mono)
@@ -2819,4 +2819,14 @@ srt.metacell.JJC.CD14_Mono<-RunUMAP(srt.metacell.JJC.CD14_Mono,reduction = "pca"
 
 DimPlot(srt.metacell.JJC.CD14_Mono,reduction = "umap",split.by = 'CT',group.by = 'CT')
 
+srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.NineHealthy.rds')
+srt.metacell.soup<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.droplet.0.08.rds')
+plotMetaCellByIndividual(srt.metacell,"CD14 Mono","ABHD6","data")
+plotMetaCellByIndividual(srt.metacell,"CD14 Mono","MT-CO2","data")
 
+generateCircadianMatBySample(srt.metacell,out.file='/tmpdata/LyuLin/analysis/circadian/R/matBySample.NineHealthy.rds',pooled.sample = F)
+
+# 9 healthy individual, seacell0.08
+AllJTKresult.filtered<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.bytype.0.08.NineHealhy.rds")
+AllJTKresult.filtered<-AllJTKresult.filtered[AllJTKresult.filtered$fold_to_background>2,]
+plotOscillatingGeneSummarise(AllJTKresult.filtered)
