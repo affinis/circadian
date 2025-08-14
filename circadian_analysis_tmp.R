@@ -2821,8 +2821,8 @@ DimPlot(srt.metacell.JJC.CD14_Mono,reduction = "umap",split.by = 'CT',group.by =
 
 srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.NineHealthy.rds')
 srt.metacell.soup<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.droplet.0.08.rds')
-plotMetaCellByIndividual(srt.metacell,"CD14 Mono","ABHD6","data")
-plotMetaCellByIndividual(srt.metacell,"CD14 Mono","MT-CO2","data")
+plotMetaCellByIndividual(srt.metacell,"CD14 Mono","NR1D2","data")
+plotMetaCellByIndividual(srt.metacell.test,"CD14 Mono","NR1D2","data")
 
 generateCircadianMatBySample(srt.metacell,out.file='/tmpdata/LyuLin/analysis/circadian/R/matBySample.NineHealthy.rds',pooled.sample = F)
 
@@ -2830,3 +2830,116 @@ generateCircadianMatBySample(srt.metacell,out.file='/tmpdata/LyuLin/analysis/cir
 AllJTKresult.filtered<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.bytype.0.08.NineHealhy.rds")
 AllJTKresult.filtered<-AllJTKresult.filtered[AllJTKresult.filtered$fold_to_background>2,]
 plotOscillatingGeneSummarise(AllJTKresult.filtered)
+
+## 2025.7.28, on HPC
+srt.metacell<-readRDS('~/analysis/circadian/R/seacell.0.04.12Individual.rds')
+srt.metacell<-NormalizeData(srt.metacell)
+JTKresults<-readJTKFromMetaCells('~/analysis/circadian/R/seacell.meta2d.0.04.12Healthy.bytype/')
+JTKresults.filtered<-dplyr::filter(JTKresults,PER>=20,PER<=28,ADJ.P<0.05)
+
+LSresults<-readLSFromMetaCells('~/analysis/circadian/R/seacell.meta2d.0.04.12Healthy.bytype/')
+LSresults.filtered<-dplyr::filter(LSresults,Period>=20,Period<=28,!is.na(Period),p<0.05,BH.Q<0.05)
+
+plotPeakAmongIndividuals(JTKresults.filtered,"NR1D2")
+plotMetaCellByIndividual(srt.metacell,"CD14 Mono","NR1D2","data")
+srt.metacell$celltype<-srt.metacell$type
+plotOscillatingGeneSummarise(JTKresults.filtered,"CD14 Mono",x.axis="phase.consist")
+plotOscillatingGeneSummarise(LSresults.filtered,"NK",x.axis="phase.consist",method = "LS")
+plotMetaCellByIndividual(srt.metacell,"CD14 Mono","CD55","data")
+
+plotMainCircadianGeneByIndividualByType(LSresults)
+plotMainCircadianGeneByIndividualByType(JTKresults)
+
+plotPhaseBetweenIndividuals(LSresults.filtered,"ZYX","ZYJ","CD14 Mono")
+
+## 2025.7.29, on LC-server
+srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.04.12Individual.rds')
+srt.metacell<-NormalizeData(srt.metacell)
+
+JTKresults<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.bytype.0.04.12Healthy.rds')
+JTKresults.filtered<-dplyr::filter(JTKresults,PER>=20,PER<=28,ADJ.P<0.05,fold_to_background>2)
+JTKresults.filtered %>% group_by(CycID)
+
+LSresults<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/LS.result.filtered.addp2bkg.bytype.0.04.12Healthy.rds')
+LSresults.filtered<-dplyr::filter(LSresults,Period>=20,Period<=28,!is.na(Period),p<0.05,BH.Q<0.05,fold_to_background>2)
+
+plotMainCircadianGeneByIndividualByType(LSresults)
+plotMainCircadianGeneByIndividualByType(JTKresults)
+
+plotCountOscilattingByMetaCelltype(JTKresults.filtered)
+plotCountOscilattingByMetaCelltype(LSresults.filtered)
+
+plotPhaseBetweenIndividuals(LSresults.filtered,"ZYX","XAH","CD14 Mono")
+plotPhaseBetweenCelltypes(LSresults.filtered,"NK","CD8 TEM","ZYX")
+
+plotOscillatingGeneSummarise(LSresults.filtered,"CD8 TEM",x.axis="amp",y.axis="phase.consist",method = "LS")
+plotMetaCellByIndividual(srt.metacell,"CD14 Mono","FTL","data")
+
+LSresults.filtered<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/LS.result.filtered.addp2bkg.addp2t.bytype.0.04.12Healthy.rds')
+LSresults.filtered<-dplyr::filter(LSresults.filtered,Period>=20,Period<=28,!is.na(Period),p<0.05,BH.Q<0.05,fold_to_background>2)
+plotOscillatingGeneSummarise(LSresults.filtered,"CD4 TCM",method = "LS")
+plotMetaCellByIndividual(srt.metacell,"CD4 TCM","HBB","data")
+
+JTKresults.filtered<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addp2t.bytype.0.04.12Healthy.rds')
+JTKresults.filtered<-dplyr::filter(JTKresults.filtered,PER>=20,PER<=28,,ADJ.P<0.05,BH.Q<0.05,fold_to_background>2)
+plotOscillatingGeneSummarise(JTKresults.filtered,"CD14 Mono",x.axis="phase.consist",method = "JTK",ylim = c(0,6))
+plotMetaCellByIndividual(srt.metacell,"CD4 TCM","MALAT1","data")
+
+# 2025.7.30, on LC-server
+plotPhaseBetweenIndividuals(LSresults.filtered,"ZYX","XAH","CD14 Mono")
+plotPeakAmongIndividuals(LSresults.filtered,gene = "DDIT4")
+
+# 2025.7.31, on LC-server
+JTK.batch1<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addp2t.bytype.0.04.12Healthy.rds")
+JTK.batch2<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.addp2t.bytype.0.08.rds")
+
+JTK.batch2<-dplyr::filter(JTK.batch2,cor_to_batch<0.2)
+JTK.ALL<-rbind(JTK.batch2[-10],JTK.batch1)
+
+saveRDS(JTK.ALL,"/tmpdata/LyuLin/analysis/circadian/R/JTK.16individual.cor2batch0.2.rds")
+
+JTK.ALL<-dplyr::filter(JTK.ALL,fold_peak2trough>1.5,fold_to_background>1.5)
+#x.axis & y.axis: can be one of "amp", "minus.log.adjp", "phase.consist", "fold.peak2trough", "SPD", SPD only for method LS
+plotOscillatingGeneSummarise(JTK.ALL,"CD14 Mono",x.axis="phase.consist",y.axis="fold.peak2trough",method = "JTK",xlim=c(0,0.6),ylim=c(1.5,20))
+
+srt.metacell.batch1<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.04.12Individual.rds')
+srt.metacell.batch2<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds')
+srt.metacell<-merge(srt.metacell.batch1,srt.metacell.batch2)
+srt.metacell<-JoinLayers(srt.metacell)
+srt.metacell<-NormalizeData(srt.metacell,normalization.method = "RC",scale.factor = 1000000)
+plotMetaCellByIndividual(srt.metacell,"NK","DDIT4","data")
+plotPeakAmongIndividuals(JTK.ALL,gene = "DDIT4")
+plotPeakAmongIndividuals(JTK.ALL,gene = "TSC2")
+
+JTK.ALL.strict<-JTK.ALL %>% group_by(CycID,celltype) %>% mutate(count=n()) %>% dplyr::filter(count>=3)
+plotCountOscilattingByMetaCelltypeByCT(JTK.ALL)
+plotCountOscilattingByMetaCelltypeByCT(JTK.ALL.strict)
+
+saveRDS(srt.metacell,"/tmpdata/LyuLin/analysis/circadian/R/seacell.16individual.rds")
+saveRDS(JTK.ALL,"/tmpdata/LyuLin/analysis/circadian/R/JTK.16individual.cor2batch0.2.fold2bkg1.5.fold2trough1.5.rds")
+
+plotPhaseBetweenIndividuals(JTK.ALL,"ZYX","ZYJ","CD14 Mono")
+
+LS.batch1<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/LS.result.filtered.addp2bkg.addp2t.bytype.0.04.12Healthy.rds')
+LS.batch2<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/LS.result.filtered.addp2bkg.addcor2batch.addp2t.bytype.0.08.rds')
+
+LS.batch2<-dplyr::filter(LS.batch2,cor_to_batch<0.2)
+LS.ALL<-rbind(LS.batch2[-15],LS.batch1)
+LS.ALL<-dplyr::filter(LS.ALL,fold_peak2trough>1.5,fold_to_background>1.5)
+saveRDS(LS.ALL,"/tmpdata/LyuLin/analysis/circadian/R/LS.16individual.cor2batch0.2.fold2bkg1.5.fold2trough1.5.rds")
+
+plotPhaseBetweenIndividuals(LS.ALL,"ZYX","ZYJ","CD14 Mono")
+plotPeakAmongIndividuals(LS.ALL,gene = "DDIT4")
+
+
+# 2025.8.7
+srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.16individual.rds')
+VlnPlot(srt.metacell,CIRCADIAN_GENES_MAIN,group.by = "type",stack = T,layer = "data",flip = T)
+
+# 2025.8.8
+JTK.all<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.16individual.cor2batch0.2.fold2bkg1.5.fold2trough1.5.rds")
+plotNetWorkCircadian(srt,JTK.all,0.4)
+plotEnrichGObyCT(JTK.all,type ="CD14 Mono")
+plotCountOscilattingByMetaCelltypeByCT(JTK.all)
+
+plotPhaseBetweenIndividuals(JTK.ALL,"LYH","JJC","CD4 TCM")

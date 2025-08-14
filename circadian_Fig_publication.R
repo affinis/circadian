@@ -63,7 +63,32 @@ plotFIG1C2<-DotPlot(test,rev(c("AXL","SIGLEC6",
 ggarrange(plotFIG1C1,plotFIG1C2,nrow=2,align="v",heights = c(1,5))
 ggsave('/lustre/home/acct-medll/medll/figures/circadian/Fig1C.pdf',width = 6,height=6)
 
+#FIG. 1D
+predicted_labels <- test$predicted.celltype.l2
+manual_labels <- test$manual_NI
+confusion_matrix <- table(predicted = predicted_labels, manual = manual_labels)
+normalized_confusion <- prop.table(confusion_matrix, margin = 2)
+# Convert confusion matrix to a data frame
+confusion_df <- as.data.frame(confusion_matrix)
+
+confusion_df<-confusion_df %>% group_by(predicted) %>% mutate(total=sum(Freq)) %>% mutate(proportion=Freq/total)
+# Plot
+ggplot(confusion_df, aes(x = manual, y = predicted, fill = proportion)) +
+  geom_tile(color="white") +
+  #geom_text(aes(label = Freq), color = "black") +
+  scale_fill_gradient(low = "darkblue", high = "white") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,color="black"),
+        axis.text.y = element_text(color="black")) +
+  labs(x = "manual annotations", y = "Azimuth annotations")
+
+# FIG. 1E
+
+
 #FIG. 2A
+srt.metacell<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds")
+VlnPlot(srt.metacell,CIRCADIAN_GENES_MAIN,group.by = "type",stack = T,flip = T,cols = generateColor(15,seed = 2025))+NoLegend()+xlab("")+theme(strip.text=element_text(size=10,face="plain"))
+
 test<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds")
 JTK.individual<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.rds')
 #plotdata<-plotPseudobulkByCTByIndividual(test,"CD14 Mono","ARNTL",return.data = T)

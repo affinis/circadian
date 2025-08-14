@@ -22,7 +22,7 @@ calculateCorBatch<-function(arg.type,arg.feature,mat,pooled.mode=T){
     return(this.cor)
   }
 }
-AllJTKresult.filtered<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.bytype.0.03.rds")
+AllJTKresult.filtered<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/LS.result.filtered.addp2bkg.bytype.0.08.rds")
 
 matBySample.nr<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/matBySample.rds')
 
@@ -42,4 +42,4 @@ for (i in 1:nrow(AllJTKresult.filtered)) {
   }
 }
 
-saveRDS(AllJTKresult.filtered,"/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.bytype.0.03.rds")
+saveRDS(AllJTKresult.filtered,"/tmpdata/LyuLin/analysis/circadian/R/LS.result.filtered.addp2bkg.addcor2batch.bytype.0.08.rds")

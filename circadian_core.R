@@ -24,7 +24,7 @@ library(MetaCycle)
 library(vegan)
 library(doParallel)
 library(foreach)
-#library(clusterProfiler)
+library(clusterProfiler)
 #library(destiny)
 library(ggcorrplot)
 # devtools::install_github("micnngo/tauFisher", build_vignettes = TRUE) 
@@ -48,6 +48,8 @@ library(ggradar)
 # drc used to analyse ELISA data
 library(drc)
 library(ggpubr)
+# arrow used to read feather file in CYTOF
+libarary(arrow)
 
 SCRIPTS<-"/tmpdata/LyuLin/script/wrapper_script/"
 source(paste(SCRIPTS,"seuratWrapper.R",sep="/"))
@@ -59,7 +61,7 @@ source('/tmpdata/LyuLin/script/circadian/ggplot2_core.R')
 #:::::::::::::::::::::#
 
 setwd('/tmpdata/LyuLin/analysis/circadian/cellranger/')
-HOME='/tmpdata/LyuLin/analysis/circadian/cellranger'
+HOME='/tmpdata/LyuLin/analysis/circadian/cellranger/'
 #INTERNAL_CONTROL<-c("CDK4")
 INTERNAL_CONTROL<-c("ACTB","GAPDH","B2M","RPLP0","TBP","HPRT1","PPIA")
 time_point<-c(9,13,17,21,1,5)
@@ -209,6 +211,7 @@ readAllMetaCell<-function(file.path,proportion,empty.drop.mode=F){
     i=i+1
     if(i%%100==0){
       message(paste0(i,"/",length(samples)))
+      message(sample)
     }
   }
   mat_c=as.data.frame(mat_c)
@@ -241,6 +244,32 @@ readAllMetaCell<-function(file.path,proportion,empty.drop.mode=F){
   }
   srt=AddMetaData(srt,metadata=colSums(LayerData(srt)),col.name = "nCount_RNA")
   return(srt)
+}
+
+# Function: readLSFromMetaCells
+# get all meta cell LS result by individual
+# caller: NSF
+# dependency: getField
+# upstream: wrapper.testRhythmicity.R
+# downstream: 
+readLSFromMetaCells<-function(path){
+  filesLS=list.files(path,pattern = "LSresult_*")
+  res=NULL
+  for(file in filesLS){
+    this.individual=getField(file,"_",2)
+    this.celltype=getField(file,"_",-c(1,2)) %>% gsub(".txt","",.,fixed = T) %>% gsub("_"," ",.)
+    message(paste0("reading data from individual: ",this.individual,", celltype: ",this.celltype))
+    this.res=read.delim(file.path(path,file),header = T)
+    this.res$individual=this.individual
+    this.res$celltype=this.celltype
+    if(is.null(res)){
+      res=this.res
+    }else{
+      res=rbind(res,this.res)
+    }
+  }
+  print(head(res))
+  return(res)
 }
 
 # Function: readJTKFromMetaCells
@@ -554,7 +583,7 @@ integrateMergedSrt<-function(srt.merged.dim){
   srt.merged.dim=IntegrateLayers(object=srt.merged.dim, method=CCAIntegration, 
                                   orig.reduction="pca", new.reduction="integrated.cca",verbose = FALSE)
   srt.merged.dim[["RNA"]]=JoinLayers(srt.merged.dim[["RNA"]])
-  srt.merged.dim=FindNeighbors(srt.merged.dim, reduction = "integrated.cca", dims = 1:30)
+  srt.merged.dim=FindNeighbors(srt.merged.dim, reduction = "integrated.cca")
   srt.merged.dim=FindClusters(srt.merged.dim, resolution = 0.1)
   srt.merged.dim=RunUMAP(srt.merged.dim, dims = 1:30, reduction = "integrated.cca")
   return(srt.merged.dim)
@@ -596,16 +625,18 @@ integrateSubset<-function(subsrt,method=CCAIntegration,classic.normalize=T,k.wei
   }
   subsrt=RunPCA(subsrt)
   if(classic.normalize){
-    subsrt=IntegrateLayers(object=subsrt, method=method, orig.reduction="pca", new.reduction="integrated.cca",verbose = FALSE,k.weight=k.weight)
+    subsrt=IntegrateLayers(object=subsrt, method=method, orig.reduction="pca",
+                           new.reduction="integrated.cca",verbose = FALSE,k.weight=k.weight)
     subsrt[["RNA"]]=JoinLayers(subsrt[["RNA"]])
   }else{
-    subsrt=IntegrateLayers(object=subsrt, method=method, orig.reduction="pca", normalization.method = "SCT",k.weight=k.weight,
+    subsrt=IntegrateLayers(object=subsrt, method=method, orig.reduction="pca",
+                           normalization.method = "SCT",k.weight=k.weight,
                            new.reduction="integrated.cca",verbose = FALSE)
     subsrt[["RNA"]]=JoinLayers(subsrt[["RNA"]])
   }
-  subsrt=FindNeighbors(subsrt, reduction = "integrated.cca", dims = 1:30)
+  subsrt=FindNeighbors(subsrt, reduction = "integrated.cca")
   subsrt=FindClusters(subsrt, resolution = 0.2)
-  subsrt=RunUMAP(subsrt, dims = 1:30, reduction = "integrated.cca")
+  subsrt=RunUMAP(subsrt, reduction = "integrated.cca")
   return(subsrt)
 }
 
@@ -2389,14 +2420,14 @@ generateAdjacencyMatrix<-function(JTK_CYCL_out,spread=F){
 # downstream: NSF
 # caller: NSF
 # dependency: generateAdjacencyMatrix
-plotNetWorkCircadian<-function(srt,JTK.result.filtered){
+plotNetWorkCircadian<-function(srt,JTK.result.filtered,float.shared.ratio=0.05){
   nFeatureType=srt@meta.data[,c("nFeature_RNA","type")] %>% group_by(type) %>% summarise(median_genes=max(nFeature_RNA))
   nCircadianType=JTK.result.filtered$celltype %>% table %>% as.data.frame() %>% `colnames<-`(c("type","circadian_genes"))
   meta.data=left_join(nCircadianType,nFeatureType) %>% mutate(rhythmic_gene_ratio=circadian_genes/median_genes)
   colnames(meta.data)[1]="from.type"
   
   AM=generateAdjacencyMatrix(JTK.result.filtered)
-  AM=AM %>% dplyr::filter(shared.ratio>0.05)
+  AM=AM %>% dplyr::filter(shared.ratio>float.shared.ratio)
   AM=left_join(AM,meta.data) %>% as.data.frame()
   
   graph=graph_from_data_frame(AM, directed = TRUE)
@@ -2463,13 +2494,13 @@ plotRadarCellType<-function(srt,celltypes,feature,colors=generateColor(25)){
 # downstream: NSF
 # dependency: NSF
 # caller: NSF
-plotCountOscilattingByMetaCelltype<-function(JTK.result,threshold.ADJ.P=0.05,PER.floor=20,PER.ceiling=28){
-  AllJTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
+plotCountOscilattingByMetaCelltype<-function(JTK.result){
+  #AllJTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
   #filter for genes oscillate in at least 2 people
   #filtered.genes=AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
   #filtered.genes=filtered.genes$CycID %>% unique()
   #AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
-  plotdata=(AllJTKresult.filtered[c("CycID","celltype")] %>% unique())$celltype %>% table() %>% as.data.frame()
+  plotdata=(JTK.result[c("CycID","celltype")] %>% unique())$celltype %>% table() %>% as.data.frame()
   colnames(plotdata)[1]="cell_type"
   plotdata$main_type=CELL_TYPES[as.vector(plotdata$cell_type)] %>% as.character()
   print(head(plotdata))
@@ -2479,6 +2510,26 @@ plotCountOscilattingByMetaCelltype<-function(JTK.result,threshold.ADJ.P=0.05,PER
           panel.grid.major.y = element_line(color="grey"))+
     scale_fill_manual(values = generateColor(n = length(unique(plotdata$main_type))))+
     ylab("# of oscillating genes")+ xlab("")+NoLegend()
+}
+
+# Function: plotCountOscilattingByIndividualByType
+# plot bar plot showing count of circadian genes for each cell type
+##
+# upstream: readJTKFromMetaCells
+# downstream: NSF
+# dependency: NSF
+# caller: NSF
+plotCountOscilattingByIndividualByType<-function(JTK.result){
+  plotdata=(JTK.result[c("CycID","celltype","individual")] %>% unique())[c("celltype","individual")] %>% table() %>% as.data.frame()
+  colnames(plotdata)[1]="cell_type"
+  plotdata$main_type=CELL_TYPES[as.vector(plotdata$cell_type)] %>% as.character()
+  print(head(plotdata))
+  ggplot(plotdata)+geom_bar(aes(x=cell_type,y=Freq,fill=main_type),stat="identity",color="black")+
+    scale_y_continuous(expand = c(0,0),limits = c(0,max(plotdata$Freq)+100))+scale_x_discrete(limits=names(CELL_TYPES))+
+    theme(axis.text.x = element_text(angle=60,hjust=1),panel.background = element_rect(fill="white",color="black"),
+          panel.grid.major.y = element_line(color="grey"))+
+    scale_fill_manual(values = generateColor(n = length(unique(plotdata$main_type))))+
+    ylab("# of oscillating genes")+ xlab("")+NoLegend()+facet_wrap(~individual)
 }
 
 # Function: plotCountOscilattingByMetaCelltypeByCT
@@ -2496,8 +2547,8 @@ plotCountOscilattingByMetaCelltypeByCT<-function(JTK.result,threshold.ADJ.P=0.05
   #AllJTKresult.filtered=AllJTKresult.filtered[AllJTKresult.filtered$CycID %in% filtered.genes,]
   plotdata=AllJTKresult.filtered[c("celltype","LAG","individual")] %>% table() %>% as.data.frame()
   print(head(plotdata))
-  ggplot(plotdata)+geom_bar(aes(x=LAG,y=Freq,fill=celltype),stat="identity")+
-    facet_grid(rows=vars(celltype),cols=vars(individual),scale="free")
+  ggplot(plotdata)+geom_bar(aes(x=LAG,y=Freq,fill=individual),stat="identity")+
+    facet_wrap(~celltype,scale="free_y")
 }
 
 # Function: plotEnrichGObyCT
@@ -2577,15 +2628,23 @@ plotEnrichGObyCT<-function(JTK.result,type,threshold.ADJ.P=0.05,PER.floor=20,PER
 
 # Function: plotPeakAmongIndividuals
 ##
-# 
-plotPeakAmongIndividuals<-function(JTKresult,gene,float.barlength=0.1){
-  plotdata=JTKresult[JTKresult$CycID==gene,]
+# upstream: readLSFromMetaCells, readJTKFromMetaCells
+# downstream: NSF
+# caller: NSF
+# dependency: NSF
+plotPeakAmongIndividuals<-function(result,gene,float.barlength=0.1){
+  plotdata=result[result$CycID==gene,]
   if(nrow(plotdata)==0){
     stop("no data available")
   }
+  if("LAG" %in% colnames(plotdata)){
+    lag.char="LAG"
+  }else{
+    lag.char="PhaseShift"
+  }
   plotdata$celltype=as.factor(plotdata$celltype)
   ggplot(plotdata)+geom_vline(aes(xintercept=as.numeric(celltype)))+
-    geom_segment(aes(x=as.numeric(celltype)-float.barlength,xend=as.numeric(celltype)+float.barlength,y=LAG,yend=LAG,color=individual),size=2)+
+    geom_segment(aes(x=as.numeric(celltype)-float.barlength,xend=as.numeric(celltype)+float.barlength,y=get(lag.char),yend=get(lag.char),color=individual),size=2)+
     ylim(c(0,23))+scale_x_discrete(limits = levels(plotdata$celltype)) +
     labs(x = "", y = "peaking time",title = paste0("phase of ",gene,"\namong individuals")) + scale_color_aaas()+
     theme_minimal()+theme(axis.text.x = element_text(angle = 60, hjust = 1, color="black"),
@@ -2593,16 +2652,100 @@ plotPeakAmongIndividuals<-function(JTKresult,gene,float.barlength=0.1){
                           plot.title = element_text(hjust=0.5))+NoLegend()
 }
 
-# Function: plotOscillatingGeneSummarise
+# plotPhaseBetweenIndividuals
 ##
-# upstream: readJTKFromMetaCells
+# upstream: readLSFromMetaCells, readJTKFromMetaCells
 # downstream: NSF
 # caller: NSF
 # dependency: NSF
-plotOscillatingGeneSummarise<-function(JTKresult,vec.plottype=NULL){
+plotPhaseBetweenIndividuals<-function(result,individual1,individual2,celltype=NULL){
+  if("LAG" %in% colnames(result)){
+    phase.char="LAG"
+  }else{
+    phase.char="PhaseShift"
+  }
+  if(!is.null(celltype)){
+    result=result[result$celltype==celltype&result$individual %in% c(individual1,individual2),]
+    shared.genes=result$CycID[duplicated(result$CycID)]
+    data1=result[result$individual==individual1&result$CycID%in%shared.genes,c("CycID",phase.char)]
+    data2=result[result$individual==individual2&result$CycID%in%shared.genes,c("CycID",phase.char)]
+    colnames(data1)[2]=individual1
+    colnames(data2)[2]=individual2
+    plotdata=left_join(data1,data2,by="CycID")
+  }else{
+    data1=result[result$individual==individual1,c("CycID",phase.char,"celltype")]
+    data2=result[result$individual==individual2,c("CycID",phase.char,"celltype")]
+    colnames(data1)[2]=individual1
+    colnames(data2)[2]=individual2
+    plotdata=inner_join(data1,data2,by=c("CycID","celltype"))
+  }
+  assign("runtime.plotPhaseBetweenIndividuals.plotdata",plotdata,envir=.GlobalEnv)
+  p=ggplot(plotdata)+geom_point(aes(x=get(individual1),y=get(individual2)),alpha=0.25)+
+    geom_abline(slope=1,intercept=0)+geom_abline(slope=1,intercept=4,linetype="dashed")+geom_abline(slope=1,intercept=-4,linetype="dashed")+
+    geom_abline(slope=1,intercept=8,linetype="dashed")+geom_abline(slope=1,intercept=-8,linetype="dashed")+
+    xlab("phase in individual1")+ylab("phase in individual2")+theme_minimal()+ggtitle(paste0(individual1," vs ",individual2))+
+    xlim(c(0,24))+ylim(c(0,24))
+  if(length(intersect(CIRCADIAN_GENES_MAIN,plotdata$CycID))>=1){
+    message(CIRCADIAN_GENES_MAIN[CIRCADIAN_GENES_MAIN%in%plotdata$CycID])
+    p=p+geom_text(data=plotdata[plotdata$CycID %in% CIRCADIAN_GENES_MAIN,],aes(x=get(individual1),y=get(individual2),label=CycID,hjust=-0.25))+
+      geom_point(data=plotdata[plotdata$CycID %in% CIRCADIAN_GENES_MAIN,],aes(x=get(individual1),y=get(individual2)),color="red",size=3)
+  }
+  p
+}
+
+# plotPhaseBetweenCelltypes
+##
+# upstream: readLSFromMetaCells, readJTKFromMetaCells
+# downstream: NSF
+# caller: NSF
+# dependency: NSF
+plotPhaseBetweenCelltypes<-function(result,celltype1,celltype2,individual){
+  if("LAG" %in% colnames(result)){
+    phase.char="LAG"
+  }else{
+    phase.char="PhaseShift"
+  }
+  result=result[result$individual==individual&result$celltype %in% c(celltype1,celltype2),]
+  shared.genes=result$CycID[duplicated(result$CycID)]
+  data1=result[result$celltype==celltype1&result$CycID%in%shared.genes,c("CycID",phase.char)]
+  data2=result[result$celltype==celltype2&result$CycID%in%shared.genes,c("CycID",phase.char)]
+  colnames(data1)[2]=celltype1
+  colnames(data2)[2]=celltype2
+  plotdata=left_join(data1,data2,by="CycID")
+  assign("runtime.plotPhaseBetweenCelltypes.plotdata",plotdata,envir=.GlobalEnv)
+  p=ggplot(plotdata)+geom_point(aes(x=get(celltype1),y=get(celltype2)),alpha=0.25)+
+    geom_abline(slope=1,intercept=0)+geom_abline(slope=1,intercept=4,linetype="dashed")+geom_abline(slope=1,intercept=-4,linetype="dashed")+
+    geom_abline(slope=1,intercept=8,linetype="dashed")+geom_abline(slope=1,intercept=-8,linetype="dashed")+
+    xlab(celltype1)+ylab(celltype2)+theme_minimal()+ggtitle(paste0(celltype1," vs ",celltype2))+
+    xlim(c(0,24))+ylim(c(0,24))
+  if(length(intersect(CIRCADIAN_GENES_MAIN,shared.genes))>=1){
+    message(CIRCADIAN_GENES_MAIN[CIRCADIAN_GENES_MAIN%in%shared.genes])
+    p=p+geom_text(data=plotdata[plotdata$CycID %in% CIRCADIAN_GENES_MAIN,],aes(x=get(celltype1),y=get(celltype2),label=CycID,hjust=-0.25))+
+      geom_point(data=plotdata[plotdata$CycID %in% CIRCADIAN_GENES_MAIN,],aes(x=get(celltype1),y=get(celltype2)),color="red",size=3)
+  }
+  p
+}
+
+# Function: plotOscillatingGeneSummarise
+# x.axis & y.axis: can be one of "amp", "minus.log.adjp", "phase.consist", "fold.peak2trough", "SPD", SPD only for method LS
+##
+# upstream: wrapper.addpeak2trough.R
+# downstream: NSF
+# caller: NSF
+# dependency: NSF
+plotOscillatingGeneSummarise<-function(result,vec.plottype=NULL,x.axis="phase.consist",
+                                       y.axis="fold.peak2trough",method="JTK",ylim=NULL,xlim=NULL,int.color.index=1){
   allplotdata=NULL
-  for(celltype in unique(JTKresult$celltype)){
-    n.ocurrence.suma=JTKresult[JTKresult$celltype==celltype,] %>% group_by(CycID) %>% summarise(n.ocurrence=n(),minus.log.adjp=median(-log10(ADJ.P)),amp=median(AMP))
+  for(celltype in unique(result$celltype)){
+    if(method=="JTK"){
+      n.ocurrence.suma=result[result$celltype==celltype,] %>% group_by(CycID) %>% summarise(n.ocurrence=n(),
+                       minus.log.adjp=median(-log10(ADJ.P)),amp=median(AMP),phase.consist=1/(1+sd(LAG)),
+                       fold.peak2trough=mean(fold_peak2trough))
+    }else{
+      n.ocurrence.suma=result[result$celltype==celltype,] %>% group_by(CycID) %>% summarise(n.ocurrence=n(),
+                       minus.log.adjp=median(-log10(BH.Q)),amp=median(PhaseShiftHeight),phase.consist=1/(1+sd(PhaseShift)),
+                       SPD=median(PeakSPD),fold.peak2trough=mean(fold_peak2trough))
+    }
     #print(head(n.ocurrence.suma))
     plotdata=n.ocurrence.suma
     plotdata$celltype=celltype
@@ -2612,15 +2755,44 @@ plotOscillatingGeneSummarise<-function(JTKresult,vec.plottype=NULL){
       allplotdata=rbind(allplotdata,plotdata)
     }
   }
-  allplotdata=allplotdata[!is.na(allplotdata$CycID),]
   assign("runtime.plotOscillatingGeneSummarise.allplotdata",allplotdata,envir = .GlobalEnv)
+  allplotdata=allplotdata[!is.na(allplotdata$CycID)&!is.na(allplotdata$phase.consist),]
   if(!is.null(vec.plottype)){
     allplotdata=allplotdata[allplotdata$celltype %in% vec.plottype,]
   }
-  ggplot(allplotdata)+geom_point(aes(x=amp,y=minus.log.adjp,size=n.ocurrence,color=celltype),alpha=0.7)+
-    facet_wrap(~celltype,scales="free")+
-    geom_text_repel(data = allplotdata[allplotdata$n.ocurrence>6,],aes(x=amp,y=minus.log.adjp,label=CycID),hjust=1,vjust=1)+
-    scale_color_manual(values=generateColor(length(unique(allplotdata$celltype))))+labs(x="peaking expression",y="-log10(p.adj)")+
+  if(x.axis=="amp"){
+    x.lab="peaking expression"
+  }else if(x.axis=="phase.consist"){
+    x.lab="phase consistency"
+  }else if(x.axis=="minus.log.adjp"){
+    x.lab="-log10(p.adj)"
+  }else if(x.axis=="SPD"){
+    x.lab="spectral power density"
+  }else if(x.axis=="fold.peak2trough"){
+    x.lab="fold change between peak and trough"
+  }
+  if(y.axis=="amp"){
+    y.lab="peaking expression"
+  }else if(y.axis=="phase.consist"){
+    y.lab="phase consistency"
+  }else if(y.axis=="minus.log.adjp"){
+    y.lab="-log10(p.adj)"
+  }else if(y.axis=="SPD"){
+    y.lab="spectral power density"
+  }else if(y.axis=="fold.peak2trough"){
+    y.lab="fold change between peak and trough"
+  }
+  allplotdata=allplotdata[!is.infinite(allplotdata[[y.axis]]),]
+  if(is.null(ylim)){
+    ylim=c(0,max(allplotdata[[y.axis]]))
+  }
+  if(is.null(xlim)){
+    xlim=c(0,max(allplotdata[[x.axis]]))
+  }
+  ggplot(allplotdata[allplotdata$n.ocurrence>2,])+geom_point(aes(x=get(x.axis),y=get(y.axis),size=n.ocurrence,color=celltype),alpha=0.7)+
+    facet_wrap(~celltype,scales="free")+ylim(ylim)+xlim(xlim)+
+    geom_text_repel(data = allplotdata[allplotdata$n.ocurrence>4,],aes(x=get(x.axis),y=get(y.axis),label=CycID),hjust=1,vjust=1,max.overlaps=10,size=4)+
+    scale_color_manual(values=generateColor(length(unique(allplotdata$celltype)))[int.color.index])+labs(x=x.lab,y=y.lab)+
     theme_minimal(base_size = 12)+theme(strip.text = element_text(size = 12))
 }
 
@@ -2750,8 +2922,8 @@ modAzimuthAnnotation<-function(srt){
 # downstream: plotMetaCellByIndividual, plotExpressionWithSoup, <Rscript>wrapper.testRhythmicity.R
 # caller: NSF
 # dependency: readAllMetaCell, integrateSubset
-metacell2srt<-function(meta.cell.path,out.rds.path,std.cellranger.out=F,empty.drop.mode=F){
-  srt.metacell=readAllMetaCell(meta.cell.path,std.cellranger.out = std.cellranger.out,empty.drop.mode = empty.drop.mode)
+metacell2srt<-function(meta.cell.path,out.rds.path,proportion,std.cellranger.out=F,empty.drop.mode=F){
+  srt.metacell=readAllMetaCell(meta.cell.path,empty.drop.mode = empty.drop.mode,proportion=proportion)
   if(!empty.drop.mode){
     srt.metacell$sample=paste0(srt.metacell$individual,"_",srt.metacell$CT)
   }
@@ -2824,6 +2996,29 @@ plotCellRangerReports<-function(sample.dir,str.metric.name,vec.color=pal_aaas()(
       ylab("Number of cells")+scale_fill_manual(values=vec.color[2])
     ggarrange(regular,pool,ncol=2,widths=c(6,1),align = "hv",common.legend = T)
   }
+}
+
+# plotMainCircadianGeneByIndividualByType
+# dotplot showing analysis result from Metacycle
+##
+# upstream: readJTKFromMetaCells, readLSFromMetaCells
+# downstream: NSF
+# caller: NSF
+# dependency: NSF
+plotMainCircadianGeneByIndividualByType<-function(result){
+  result=result[result$CycID %in% CIRCADIAN_GENES_MAIN,]
+  if("ADJ.P" %in% colnames(result)){
+    sig.char="ADJ.P"
+    peak.char="AMP"
+  }else{
+    sig.char="BH.Q"
+    peak.char="PhaseShiftHeight"
+  }
+  result$significant=ifelse(result[[sig.char]]<0.05,"black","white")
+  ggplot(result)+geom_point(aes(x=individual,y=CycID,size=-log10(get(sig.char)),fill=get(peak.char)),
+                            stroke=1,shape=21,color=result$significant)+
+    facet_wrap(~celltype)+scale_fill_gradient2(low="white",high="red")+theme_minimal()+theme(axis.text.x=element_text(hjust=1,angle=60))+
+  guides(fill=guide_legend(title="peaking expression"),size=guide_legend(title="-log10(p.adj)"))+ylab("circadian genes")
 }
 
 # generateCircadianMatBySample

@@ -13,22 +13,22 @@ source('/tmpdata/LyuLin/script/circadian/circadian_core.R')
 # dependency: NSF
 # caller: NSF
 ##
-# speed:
+# speed: ~12-24 hours depending on number of individual and number of replication
 
-if(!file.exists("/tmpdata/LyuLin/analysis/circadian/R/seacell.0.03.bytype.rds")){
-  metacell2srt("/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell_byType.0.03/",
-               out.rds.path='/tmpdata/LyuLin/analysis/circadian/R/seacell.0.03.bytype.rds',
-               std.cellranger.out = F,empty.drop.mode = F)
-}
+#if(!file.exists("/tmpdata/LyuLin/analysis/circadian/R/seacell.0.03.bytype.rds")){
+#  metacell2srt("/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell_byType.0.03/",
+#               out.rds.path='/tmpdata/LyuLin/analysis/circadian/R/seacell.0.03.bytype.rds',
+#               std.cellranger.out = F,empty.drop.mode = F)
+#}
 
-srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.03.bytype.rds')
+srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds')
 
 srt.metacell<-NormalizeData(srt.metacell,normalization.method = "RC",scale.factor = 1000000)
 mat<-as.data.frame(LayerData(srt.metacell,layer = "data"))
 
 mat<-rownames_to_column(mat,"feature")
 exp_table<-gather(mat,key="observation",value="value",-feature)
-out.dir<-"/tmpdata/LyuLin/analysis/circadian/R/seacell.meta2d.0.03.bytype/"
+out.dir<-"/tmpdata/LyuLin/analysis/circadian/R/seacell.meta2d.0.08.bytype/"
 
 if(!dir.exists(out.dir)){
   dir.create(out.dir)
@@ -42,12 +42,12 @@ individuals<-sort(unique(exp_table$individual))
 for (this.celltype in celltypes) {
   for (this.individual in individuals) {
     prefix=paste0(this.individual,"_",gsub(" ","_",this.celltype))
-    if(length(list.files(out.dir,pattern = prefix))>=1){
-      message(paste0(prefix," data exists, skipping.."))
-      next
-    }else{
-      message(paste0(prefix," analysing"))
-    }
+    #if(length(list.files(out.dir,pattern = prefix))>=1){
+    #  message(paste0(prefix," data exists, skipping.."))
+    #  next
+    #}else{
+    #  message(paste0(prefix," analysing"))
+    #}
     this.exp_table=dplyr::filter(exp_table,type==this.celltype,individual==this.individual)
     if(nrow(this.exp_table)==0){
       message("no expression data, skipping")
@@ -77,7 +77,7 @@ for (this.celltype in celltypes) {
     prefix=paste0(this.individual,"_",gsub(" ","_",this.celltype))
     write.table(this.exp_table, file=paste0(out.dir,prefix,".txt"),
                 sep="\t", quote=FALSE, row.names=FALSE)
-    meta2d(infile=paste0(out.dir,prefix,".txt"), filestyle="txt",cycMethod = c("JTK"),
+    meta2d(infile=paste0(out.dir,prefix,".txt"), filestyle="txt",cycMethod = c("LS"),
            outdir=out.dir, timepoints=rep(c(11,15,19,23,3,7,11), each=min.n),nCores = 64,
            outIntegration="noIntegration")
   }
