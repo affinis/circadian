@@ -1344,7 +1344,7 @@ plotRhythmicityPvalue<-function(celltypes,p.cutoff=1,features=CIRCADIAN_GENES_MA
 # upstream: readAllMetaCell, metacell2srt
 # dependency: fetchMergedDataOneCellType, getField
 # caller: NSF
-plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dist=T,droplet.mode=F,float.alpha=0.25,metacell.mode=T,internal_control="nCount_RNA"){
+plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dist=T,droplet.mode=F,float.alpha=0.25,metacell.mode=T,internal_control="nCount_RNA",merge=T){
   data=fetchMergedDataOneCellType(srt,cell.type=cell.type,gene.list=feature,CT_field=3,patient_filed = c(1,2),layer=layer,filter_data=F)
   if(droplet.mode){
     data$time=as.vector(srt$CT[data$observation])
@@ -1372,15 +1372,31 @@ plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dis
                        relative_median=median(relative_expression))
   print(head(data))
   if(layer=="data"){
-    ggplot(data)+geom_boxplot(aes(x=time,y=values),outlier.alpha=0)+
-      geom_jitter(aes(x=time,y=values),alpha=float.alpha)+facet_wrap(~patient,scale="free_y",ncol=4)+
-      ggtitle(paste0(cell.type,": ",feature))+theme_bw()+theme(axis.text.x=element_text(angle=60,hjust=1))+
-      ylab("normalized expression")
+    if(merge){
+      ggplot(data)+
+        geom_rect(xmin = "CT17", xmax = "CT29", ymin = -Inf, ymax = Inf,fill = "gray", alpha = 0.1)+
+        geom_boxplot(aes(x=time,y=relative_expression),outlier.alpha=0,fill="lightblue")+
+        ggtitle(paste0(cell.type,": ",feature))+theme_classic()+theme(axis.text.x=element_text(angle=60,hjust=1))+
+        ylab("z-score")+xlab("")
+    }else{
+      ggplot(data)+geom_boxplot(aes(x=time,y=values),outlier.alpha=0)+
+        geom_jitter(aes(x=time,y=values),alpha=float.alpha)+facet_wrap(~patient,scale="free_y",ncol=4)+
+        ggtitle(paste0(cell.type,": ",feature))+theme_bw()+theme(axis.text.x=element_text(angle=60,hjust=1))+
+        ylab("normalized expression")
+    }
   }else{
+    if(merge){
+      ggplot(data)+
+        geom_rect(xmin = "CT17", xmax = "CT29", ymin = -Inf, ymax = Inf,fill = "gray", alpha = 0.1)+
+        geom_boxplot(aes(x=time,y=relative_expression),outlier.alpha=0,fill="lightblue")+
+        ggtitle(paste0(cell.type,": ",feature))+theme_classic()+theme(axis.text.x=element_text(angle=60,hjust=1))+
+        ylab("z-score")+xlab("")
+    }else{
       ggplot(data)+geom_boxplot(aes(x=time,y=normalized),outlier.alpha=0)+
       geom_jitter(aes(x=time,y=normalized),alpha=float.alpha)+facet_wrap(~patient,scale="free_y",ncol=4)+
       ggtitle(paste0(cell.type,": ",feature))+theme_bw()+theme(axis.text.x=element_text(angle=60,hjust=1))+
       ylab("normalized expression")
+    }
   }
 }
 
@@ -2494,7 +2510,7 @@ plotRadarCellType<-function(srt,celltypes,feature,colors=generateColor(25)){
 # downstream: NSF
 # dependency: NSF
 # caller: NSF
-plotCountOscilattingByMetaCelltype<-function(JTK.result){
+plotCountOscilattingByMetaCelltype<-function(JTK.result,flip=F,show.zero=T){
   #AllJTKresult.filtered=filter(JTK.result,ADJ.P<threshold.ADJ.P,PER>=PER.floor,PER<=PER.ceiling)
   #filter for genes oscillate in at least 2 people
   #filtered.genes=AllJTKresult.filtered[c("CycID","celltype")] %>% table() %>% as.data.frame() %>% dplyr::filter(.,Freq>=2)
@@ -2504,12 +2520,26 @@ plotCountOscilattingByMetaCelltype<-function(JTK.result){
   colnames(plotdata)[1]="cell_type"
   plotdata$main_type=CELL_TYPES[as.vector(plotdata$cell_type)] %>% as.character()
   print(head(plotdata))
-  ggplot(plotdata)+geom_bar(aes(x=cell_type,y=Freq,fill=main_type),stat="identity",color="black")+
-    scale_y_continuous(expand = c(0,0),limits = c(0,max(plotdata$Freq)+100))+scale_x_discrete(limits=names(CELL_TYPES))+
-    theme(axis.text.x = element_text(angle=60,hjust=1),panel.background = element_rect(fill="white",color="black"),
-          panel.grid.major.y = element_line(color="grey"))+
-    scale_fill_manual(values = generateColor(n = length(unique(plotdata$main_type))))+
-    ylab("# of oscillating genes")+ xlab("")+NoLegend()
+  if(show.zero){
+    p=ggplot(plotdata)+geom_bar(aes(x=cell_type,y=Freq,fill=main_type),stat="identity",color="black",alpha=0.5)+
+      scale_y_continuous(expand = c(0,0),limits = c(0,max(plotdata$Freq)+100))+scale_x_discrete(limits=names(CELL_TYPES))+
+      theme(axis.text.x = element_text(angle=60,hjust=1),panel.background = element_rect(fill="white",color="black"),
+            panel.grid.major.y = element_line(color="grey"))+
+      scale_fill_manual(values = generateColor(n = length(unique(plotdata$main_type))))+
+      ylab("number of\noscillating genes")+ xlab("")+NoLegend()
+  }else{
+    p=ggplot(plotdata)+geom_bar(aes(x=cell_type,y=Freq,fill=main_type),stat="identity",color="black",alpha=0.5)+
+      scale_y_continuous(expand = c(0,0),limits = c(0,max(plotdata$Freq)+100))+
+      theme(axis.text.x = element_text(angle=60,hjust=1),panel.background = element_rect(fill="white",color="black"),
+            panel.grid.major.y = element_line(color="grey"))+
+      scale_fill_manual(values = generateColor(n = length(unique(plotdata$main_type))))+
+      ylab("number of\noscillating genes")+ xlab("")+NoLegend()
+  }
+
+  if(flip){
+    p=p+coord_flip()+scale_x_discrete(limits=rev(sort(unique(plotdata$cell_type))))
+  }
+  p
 }
 
 # Function: plotCountOscilattingByIndividualByType

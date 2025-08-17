@@ -87,15 +87,46 @@ ggplot(confusion_df, aes(x = manual, y = predicted, fill = proportion)) +
 
 #FIG. 2A
 srt.metacell<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds")
+# part1
 VlnPlot(srt.metacell,CIRCADIAN_GENES_MAIN,group.by = "type",stack = T,flip = T,cols = generateColor(15,seed = 2025))+NoLegend()+xlab("")+theme(strip.text=element_text(size=10,face="plain"))
+# part2
+plotdata<-srt.metacell$type %>% table() %>% as.data.frame()
 
-test<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds")
-JTK.individual<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.rds')
-#plotdata<-plotPseudobulkByCTByIndividual(test,"CD14 Mono","ARNTL",return.data = T)
-#plotdata2<-plotPseudobulkByCTByIndividual(test,"NK","CRY1",return.data = T)
-#plotdata3<-plotPseudobulkByCTByIndividual(test,"Plasma","PER3",return.data = T)
-#plotdata4<-plotPseudobulkByCTByIndividual(test,"CD16 Mono","NR1D1",return.data = T)
-plotMetaCellByIndividual(test,cell.type = "CD14 Mono",feature = "NR1D2",layer = "data")
+ggplot(plotdata)+
+  geom_text(data=plotdata[plotdata$Freq<2500,],aes(x=get("."),y=Freq,label=Freq),hjust=-0.25,size=4,angle=90)+
+  geom_text(data=plotdata[plotdata$Freq>=2500,],aes(x=get("."),y=Freq/2,label=Freq),size=4,angle=90)+
+  geom_bar(aes(x=get("."),y=Freq),stat="identity",fill="darkblue",alpha=0.5,color="black")+
+  theme_minimal_hgrid(font_size = 12)+theme(axis.text.x = element_blank(),axis.ticks = element_blank())+
+  xlab("")+ylab("number of metacells")+scale_y_continuous(limits = c(0,10000),expand = c(0,0))+xlim(plotdata$.)
+
+# FIG.2B
+JTK.batch1<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addp2t.bytype.0.04.12Healthy.rds')
+JTK.batch2<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.addp2bkg.addcor2batch.addp2t.bytype.0.08.rds')
+JTK.ALL<-rbind(JTK.batch1,JTK.batch2[-10])
+JTK.ALL<-JTK.ALL %>% group_by(CycID,celltype) %>% mutate(n.individual=n())
+JTK.ALL.filtered<-dplyr::filter(JTK.ALL,n.individual>=2)
+plotCountOscilattingByMetaCelltype(JTK.ALL)
+plotCountOscilattingByMetaCelltype(JTK.ALL.filtered,flip = T)
+
+JTK.raw1<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.bytype.0.04.12Healthy.rds')
+JTK.raw2<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/JTK.result.filtered.bytype.0.08.rds')
+JTK.raw.ALL<-rbind(JTK.raw1,JTK.raw2)
+JTK.raw.ALL.core<-JTK.raw.ALL[JTK.raw.ALL$CycID %in% CIRCADIAN_GENES_MAIN,]
+JTK.raw.ALL.core<-JTK.raw.ALL.core %>% group_by(CycID,celltype) %>% mutate(log.p.adj=mean(-log10(ADJ.P)),n.individual=n())
+JTK.raw.ALL.core$significant<-ifelse(JTK.raw.ALL.core$log.p.adj>=2,"YES","NO")
+ggplot(JTK.raw.ALL.core)+geom_point(aes(x=CycID,y=fct_rev(celltype),size=n.individual,fill=log.p.adj,color=significant),shape=21,width=3)+theme_classic()+
+  scale_fill_gradient2(low = "lightblue",high = "darkred",name="-log10(p.adj)")+scale_color_manual(values=c("white","black"),name="p<=0.01")+
+  theme(axis.text.x=element_text(angle=60,hjust=1,color="black"),legend.box.margin=margin(),
+        axis.text.y=element_text(color="black"),legend.margin=margin(),
+        legend.position="left")+xlab("")+ylab('')
+plotCountOscilattingByMetaCelltype(JTK.ALL.filtered,flip = T,show.zero = F)
+
+#FIG. 2C
+plot.list<-list()
+for (feature in c("BMAL1","CLOCK","PER1","PER2","PER3","CRY1","CRY2","NR1D1","NR1D2")) {
+  plot.list[[feature]]=plotMetaCellByIndividual(srt=srt.metacell,cell.type = "CD14 Mono",feature = feature,layer = "data",merge = T)
+}
+ggarrange(plotlist = plot.list)
 
 ggplot(plotdata)+geom_boxplot(aes(x=time,y=relative_expression))+
   geom_point(aes(x=time,y=relative_expression),alpha=0.5,color="blue",size=3)+
