@@ -1,13 +1,6 @@
+# devtools::install_github("micnngo/tauFisher", build_vignettes = TRUE) 
 library(tauFisher)
 library(tidyverse)
-
-getField<-function(vec,sep,field){
-  if(length(field)>1){
-    strsplit(vec,sep) %>% lapply(.,`[`,field) %>% lapply(.,paste0,collapse=sep) %>% unlist()
-  }else{
-    strsplit(vec,sep) %>% lapply(.,`[`,field) %>% unlist()
-  }
-}
 
 #using mm data, load bulk data
 bulk_file <- system.file("extdata", "GSE157077_mouse_scn_control.tsv", 
@@ -15,33 +8,33 @@ bulk_file <- system.file("extdata", "GSE157077_mouse_scn_control.tsv",
 bulk_data <- utils::read.delim(file = bulk_file, stringsAsFactors = FALSE)
 
 #using hs data
-bulk_data_hs<-read.delim('/lustre/home/acct-medll/medll/data/bulk_RNA-seq/GSE113883_TPM_processed_data.txt')
-bulk_data_hs$GENE<-getField(bulk_data_hs$GENE,"__",1)
-colnames(bulk_data_hs)[1]<-"ID"
-colnames(bulk_data_hs)[2:length(colnames(bulk_data_hs))]<-getField(colnames(bulk_data_hs)[2:length(colnames(bulk_data_hs))],"_",c(6,1,2))
-reps<-colnames(bulk_data_hs)[2:length(colnames(bulk_data_hs))] %>% getField(.,"_",2:3) %>% unique() 
-rep_name<-paste0("REP_",1:length(reps))
-i=1
-for(i in 1:length(reps)){
-  if(i %in% c(4,6,11)){
-    next
-  }
-  colnames(bulk_data_hs)=gsub(reps[i],rep_name[i],colnames(bulk_data_hs))
-}
-colnames(bulk_data_hs)<-gsub("^X","CT_",colnames(bulk_data_hs))
-colnames(bulk_data_hs)<-gsub("hr","",colnames(bulk_data_hs))
-colnames(bulk_data_hs)<-gsub("_0","_",colnames(bulk_data_hs))
-bulk_data_hs<-bulk_data_hs[,!(grepl("CT_27|CT_29|CT_25",colnames(bulk_data_hs)))]
-bulk_data_hs<-bulk_data_hs[,grepl("REP|ID",colnames(bulk_data_hs))]
-colnames(bulk_data_hs)<-gsub("REP_10","REP_4",colnames(bulk_data_hs))
-colnames(bulk_data_hs)<-gsub("REP_9","REP_6",colnames(bulk_data_hs))
-bulk_data<-bulk_data_hs
+#bulk_data_hs<-read.delim('/lustre/home/acct-medll/medll/data/bulk_RNA-seq/GSE113883_TPM_processed_data.txt')
+#bulk_data_hs$GENE<-getField(bulk_data_hs$GENE,"__",1)
+#colnames(bulk_data_hs)[1]<-"ID"
+#colnames(bulk_data_hs)[2:length(colnames(bulk_data_hs))]<-getField(colnames(bulk_data_hs)[2:length(colnames(bulk_data_hs))],"_",c(6,1,2))
+#reps<-colnames(bulk_data_hs)[2:length(colnames(bulk_data_hs))] %>% getField(.,"_",2:3) %>% unique() 
+#rep_name<-paste0("REP_",1:length(reps))
+#i=1
+#for(i in 1:length(reps)){
+#  if(i %in% c(4,6,11)){
+#    next
+#  }
+#  colnames(bulk_data_hs)=gsub(reps[i],rep_name[i],colnames(bulk_data_hs))
+#}
+#colnames(bulk_data_hs)<-gsub("^X","CT_",colnames(bulk_data_hs))
+#colnames(bulk_data_hs)<-gsub("hr","",colnames(bulk_data_hs))
+#colnames(bulk_data_hs)<-gsub("_0","_",colnames(bulk_data_hs))
+#bulk_data_hs<-bulk_data_hs[,!(grepl("CT_27|CT_29|CT_25",colnames(bulk_data_hs)))]
+#bulk_data_hs<-bulk_data_hs[,grepl("REP|ID",colnames(bulk_data_hs))]
+#colnames(bulk_data_hs)<-gsub("REP_10","REP_4",colnames(bulk_data_hs))
+#colnames(bulk_data_hs)<-gsub("REP_9","REP_6",colnames(bulk_data_hs))
+#bulk_data<-bulk_data_hs
 
 
-bulk_data_hs_mod<-bulk_data_hs
-bulk_data_hs_mod<-gather(bulk_data_hs_mod,key=sample,value=expression,-GENE)
-bulk_data_hs_mod$CT<-getField(bulk_data_hs_mod$sample,"_",6)
-bulk_data_hs_mod[grepl("^PER1",bulk_data_hs_mod$GENE),] %>% ggplot(.)+geom_point(aes(x=CT,y=expression))
+#bulk_data_hs_mod<-bulk_data_hs
+#bulk_data_hs_mod<-gather(bulk_data_hs_mod,key=sample,value=expression,-GENE)
+#bulk_data_hs_mod$CT<-getField(bulk_data_hs_mod$sample,"_",6)
+#bulk_data_hs_mod[grepl("^PER1",bulk_data_hs_mod$GENE),] %>% ggplot(.)+geom_point(aes(x=CT,y=expression))
 
 
 # Take the average expression if there are non-unique genes
@@ -88,7 +81,7 @@ time_adj <- time_adj[order(as.numeric(time_adj))]
 
 
 #using human pseudobulk data
-srts<-getSamplesOneDayToList(HEALTH[5])
+srts<-getSamplesOneDayToList("HZD",data.path = '~/analysis/cellranger/')
 pseudobulk_data_hs<-NULL
 for(i in 1:length(srts)){
   this.data=LayerData(srts[[i]], assay = "RNA", layer = "counts") %>% rowSums() %>% as.data.frame()
@@ -126,7 +119,8 @@ print(genes)
 # Capitalize all gene names to standardize format
 rownames(bulk_adj) <- toupper(rownames(bulk_adj))
 # Subset  
-chosen_genes <- genes$JTK[genes$JTK %in% rownames(bulk_adj)]
+#chosen_genes <- genes$JTK[genes$JTK %in% rownames(bulk_adj)]
+chosen_genes<-c("CLOCK","CRY1","CRY2","DBP","HLF","NR1D1","NR1D2","PER1","PER2","PER3","TEF")
 bulk_subset <- t(data.frame(bulk_adj[chosen_genes, ]))
 rownames(bulk_subset) <- time_adj
 
@@ -134,11 +128,12 @@ rownames(bulk_subset) <- time_adj
 chosen_genes <- chosen_genes[order(chosen_genes)]
 bulk_subset <- bulk_subset[, order(colnames(bulk_subset))]
 
+
 # log2 transform
 bulk_log <- log2(bulk_subset+1)
 
 #run FDA
-nrep = 8 # number of replicates
+nrep = 3 # number of replicates
 fda_expression = get_FDAcurves(dat=bulk_log, 
                                time=time_adj, 
                                numbasis=5) %>%
@@ -178,6 +173,7 @@ pc_data$CT24<-as.numeric(vapply(stringr::str_split(rownames(pc_data), pattern = 
                                   '[', 1, FUN.VALUE = character(1) ))
 pc_data$CT24_relevel<-stats::relevel(factor(pc_data$CT24),
                       ref = as.character(min(train_time)))
+ggplot(pc_data)+geom_point(aes(x=PC1,y=PC2))+geom_text(aes(x=PC1,y=PC2,label=CT24))
 
 mod <- nnet::multinom(CT24_relevel ~ PC1 + PC2, data = pc_data, trace=T)
 

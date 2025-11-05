@@ -6,15 +6,15 @@ library(SeuratObject)
 # remotes::install_github("satijalab/seurat-data")
 library(SeuratData)
 # remotes::install_github("mojaveazure/seurat-disk")
-library(SeuratDisk)
+#library(SeuratDisk)
 library(anndata)
-library(org.Hs.eg.db)
-library(biomaRt)
+#library(org.Hs.eg.db)
+#library(biomaRt)
 library(tidyverse)
 library(hash)
 library(zeitgebr)
-# install_github("velocyto-team/velocyto.R")
-# library(velocyto.R)
+# remotes::install_github("velocyto-team/velocyto.R")
+library(velocyto.R)
 library(pagoda2)
 library(groupdata2)
 library(RColorBrewer)
@@ -24,23 +24,23 @@ library(MetaCycle)
 library(vegan)
 library(doParallel)
 library(foreach)
-library(clusterProfiler)
+#library(clusterProfiler)
 #library(destiny)
 library(ggcorrplot)
 # devtools::install_github("micnngo/tauFisher", build_vignettes = TRUE) 
 library(tauFisher)
 library(VennDiagram)
-library(shazam)
+library(shazam) # VDJ analysis dependency
 #library(dowser)
-library(scoper)
-library(alakazam)
+library(scoper) # VDJ analysis dependency
+library(alakazam) # VDJ analysis dependency
 #library(DESeq2)
 #library(ReactomePA)
 library(ggrepel)
 library(tidygraph)
 library(ggraph)
 # devtools::install_github("ricardo-bion/ggradar", dependencies = TRUE)
-library(ggradar)
+#library(ggradar)
 #library(topGO)
 #library(dorothea)
 # remotes::install_github('chris-mcginnis-ucsf/DoubletFinder', force = TRUE)
@@ -49,34 +49,37 @@ library(ggradar)
 library(drc)
 library(ggpubr)
 # arrow used to read feather file in CYTOF
-libarary(arrow)
+library(arrow)
+library(circlize)
+library(ComplexHeatmap)
+library(viridis)
 
-SCRIPTS<-"/tmpdata/LyuLin/script/wrapper_script/"
+SCRIPTS<-"~/script/wrapper_script/"
 source(paste(SCRIPTS,"seuratWrapper.R",sep="/"))
 source(paste(SCRIPTS,"seuratIntegrateWrapper.R",sep="/"))
-source('/tmpdata/LyuLin/script/circadian/ggplot2_core.R')
+source('~/script/circadian/ggplot2_core.R')
 
 #:::::::::::::::::::::#
 # GLOBAL VARs/SETTINGs
 #:::::::::::::::::::::#
 
-setwd('/tmpdata/LyuLin/analysis/circadian/cellranger/')
-HOME='/tmpdata/LyuLin/analysis/circadian/cellranger/'
+setwd('~/analysis/cellranger/')
+HOME='~/analysis/cellranger/'
 #INTERNAL_CONTROL<-c("CDK4")
 INTERNAL_CONTROL<-c("ACTB","GAPDH","B2M","RPLP0","TBP","HPRT1","PPIA")
 time_point<-c(9,13,17,21,1,5)
 time_point_inorder<-c(1,5,9,13,17,21)
 CT_TIME<-paste0("CT",time_point)
-CT_TIME_ORDER<-paste0("CT",time_point_inorder)
-PATIENTS<-c("TFSH190500A_HZD","TFSH190500F_LJQ","TFSH190500I_WLG","TFSH190500I_YXQ","TFSH190500K_QGG","TFSH190501F_XAH",
-            "TF_SLY","TF_XSP","TF_ZF","TF_ZXL","TF_ZYJ","TF_ZYX")
-AGES<-c(49,50,"WLG",50,"QGG","XAH",30,29,"ZF",29,29,30)
-EMI_PATIENTS<-c("TFSH190500I_WLG","TFSH190500K_QGG","TFSH190501F_XAH")
-HEALTH<-setdiff(PATIENTS,EMI_PATIENTS)
-VALID_INDIVIDUALS=HEALTH[HEALTH!="TF_ZF"]
+CT_TIME_ORDER<-c("CT09","CT13","CT17","CT21","CT25","CT29")
+CT_TIME_ORDER_FINE<-c("CT09","CT11","CT13","CT15","CT17","CT19","CT21","CT23","CT25","CT27","CT29","CT31","CT35")
+INDIVIDUALS_BATCH1<-c("HZD","LJQ","WLG","YXQ","QGG","XAH","SLY","XSP","ZF","ZXL","ZYJ","ZYX")
+AGES<-c("HZD"=49,"LJQ"=50,"WLG"=67,"YXQ"=50,"QGG"=53,"XAH"=67,"SLY"=30,"XSP"=29,"ZF"=NA,"ZXL"=29,"ZYJ"=29,"ZYX"=30,"KD"=27,"ZYR"=20,"LYH"=19,"JJC"=22)
+#EMI_PATIENTS<-c("TFSH190500I_WLG","TFSH190500K_QGG","TFSH190501F_XAH")
+#HEALTH<-setdiff(PATIENTS,EMI_PATIENTS)
+#VALID_INDIVIDUALS=HEALTH[HEALTH!="TF_ZF"]
 TCR_LOCUS<-c("TRA:v_call","TRA:j_call","TRB:v_call","TRB:d_call","TRB:j_call")
 BCR_LOCUS<-c("IGH:v_call","IGH:d_call","IGH:j_call","IGK:v_call","IGK:j_call","IGL:v_call","IGL:j_call")
-CIRCADIAN_GENES_MAIN<-c("CLOCK","BMAL1","PER1","PER2","PER3","CRY1","CRY2","NR1D1","NR1D2","DBP","TEF","HLF","CIART")
+CIRCADIAN_GENES_MAIN<-c("CLOCK","BMAL1","PER1","PER2","PER3","CRY1","CRY2","NR1D1","NR1D2","DBP")
 
 CIRCADIAN_GENES_PMID_38190520<-c("SERTAD1","ZNF101","PHF21A","STMN3","GNG2","IL1B","IL13RA1",
                          "NR1D1","IRS2","FKBP5","ID3","UBE2B","ZNF438","CLEC4E",
@@ -111,9 +114,20 @@ TNK_markers_ZhangZeMing<-c("CCR7","LEF1","SELL","TCF7","CD27","CD28","S1PR1", #C
 CELL_TYPES<-c("B naive"="B","B memory"="B","Plasmablast"="B","B intermediate"="B",
              "CD14 Mono"="Myeloid","CD16 Mono"="Myeloid","ASDC"="Myeloid","cDC1"="Myeloid","cDC2"="Myeloid","pDC"="Myeloid",
              "CD4 Naive"="T","CD4 CTL"="T","CD4 Proliferating"="T","CD4 TCM"="T","CD4 TEM"="T","Treg"="T",
-             "CD8 Naive"="T","CD8 TCM"="T","CD8 TEM"="T","dnT"="T","gdT"="T","ILC"="T","MAIT"="T",
-             "NK"="NK","NK_CD56ᵇʳⁱᵍʰᵗ"="NK","NK Proliferating"="NK",
+             "CD8 Naive"="T","CD8 TCM"="T","CD8 TEM"="T","CD8 Proliferating"="T","dnT"="T","gdT"="T","ILC"="T","MAIT"="T",
+             "NK"="NK","NK_CD56ᵇʳⁱᵍʰᵗ"="NK","NK Proliferating"="NK","NK_CD56bright"="NK","Platelet"="Platelet","Eryth"="Eryth",
              "HSPC"="HSPC")
+CELL_TYPES2<-c("B naive"="B","B memory"="B","Plasmablast"="Plasmablast","B intermediate"="B",
+               "B_naive"="B","B_memory"="B","B_intermediate"="B",
+               "CD14_Mono"="Monocyte","CD16_Mono"="Monocyte",
+              "CD14 Mono"="Monocyte","CD16 Mono"="Monocyte","ASDC"="pDC","cDC1"="cDC1","cDC2"="Monocyte","pDC"="pDC",
+              "CD4_Naive"="TNK","CD4_CTL"="TNK","CD4_Proliferating"="TNK","CD4_TCM"="TNK","CD4_TEM"="TNK",
+              "CD4 Naive"="TNK","CD4 CTL"="TNK","CD4 Proliferating"="TNK","CD4 TCM"="TNK","CD4 TEM"="TNK","Treg"="TNK",
+              "CD8_Naive"="TNK","CD8_TCM"="TNK","CD8_TEM"="TNK","CD8_Proliferating"="TNK","NK_Proliferating"="TNK",
+              "CD8 Naive"="TNK","CD8 TCM"="TNK","CD8 TEM"="TNK","CD8 Proliferating"="TNK","dnT"="TNK","gdT"="TNK","ILC"="TNK","MAIT"="TNK",
+              "NK"="TNK","NK_CD56ᵇʳⁱᵍʰᵗ"="TNK","NK Proliferating"="TNK","NK_CD56bright"="TNK","Platelet"="Platelet","Eryth"="Eryth",
+              "HSPC"="HSPC")
+
 celltypes_NI<-c("B_naive","CD14⁺Monocytes","CD16⁺Monocytes","CD4_naive_CCR7","CD4_TCM_AQP3",
                 "CD4_TEM_ANXA1","CD4_TEM_GNLY","CD4_TEM_GZMK","CD4_Treg_FOXP3","CD8_MAIT_SLC4A10",
                 "CD8_naive_LEF1","CD8_TEM_CMC1","CD8_TEM_GNLY","CD8_TEM_ZNF683","dnT_LYST",
@@ -130,9 +144,130 @@ BATCH_KD<-c("X5_250424MIX06"="CT11","X5_250409MIX01"="CT15","X5_250424MIX07"="CT
 BATCH_ZYR<-c("X5_250424MIX04"="CT11","X5_250409MIX01"="CT15","X5_250424MIX07"="CT19","X5_250424MIX03"="CT23","X5_250424MIX02"="CT27","X5_250424MIX05"="CT31","X5_250424MIX06"="CT35")
 
 
+CYTOF_FEATURES<-list("CD45-plt"="PTPRC","CD3-plt"=c("CD3D","CD3E","CD3G"),"CD62L"="SELL",
+                     "TCR-g-d-plt"=c("TRDC","TRGC1","TRGC2"),"CD27"="CD27","CD14-plt"="CD14",
+                     "CD195-plt"="CCR5","CD11a"="ITGAL","CD15-plt"="CD15","CD19-plt"="CD19","CD25"="IL2RA",
+                     "CD192-plt"="CCR2","CD33-plt"="CD33","CD16-plt"=c("FCGR3A","FCGR3B"),"CD5"="CD5",
+                     "CD24-plt"="CD24","CD185"="CXCR5","CD184-plt"="CXCR4","CD279-plt"="PDCD1","CD197-plt"="CCR7",
+                     "CD56-plt"="NCAM1","CD194-plt"="CCR4","CX3CR1"="CX3CR1","CD123-plt"="IL3RA","CD127"="IL7R",
+                     "CD186-plt"="CXCR6","CD66b-plt"="CEACAM8","CD183-plt"="CXCR3","CD11c-plt"="ITGAX",
+                     "CD182-plt"="CXCR2","CD57"="B3GAT1","CD28-plt"="CD28","CD38-plt"="CD38","IgD-plt"="IGHD",
+                     "CD196-plt"="CCR6","CD44-plt"="CD44","HLA-DR-plt"=c("HLA-DRA","HLA-DRB1","HLA-DRB5"),
+                     "CD45RA"="CD45RA","CD4"="CD4","CD8a"="CD8A","CD11b"="ITGAM")
+
+CYTOF2RNA_FEATURES<-c("CD45-plt"="PTPRC","CD3-plt"="CD3D","CD62L"="SELL",
+                     "TCR-g-d-plt"="TRDC","CD27"="CD27","CD14-plt"="CD14",
+                     "CD195-plt"="CCR5","CD11a"="ITGAL","CD15-plt"="CD15","CD19-plt"="CD19","CD25"="IL2RA",
+                     "CD192-plt"="CCR2","CD33-plt"="CD33","CD16-plt"="FCGR3A","CD5"="CD5",
+                     "CD24-plt"="CD24","CD185"="CXCR5","CD184-plt"="CXCR4","CD279-plt"="PDCD1","CD197-plt"="CCR7",
+                     "CD56-plt"="NCAM1","CD194-plt"="CCR4","CX3CR1"="CX3CR1","CD123-plt"="IL3RA","CD127"="IL7R",
+                     "CD186-plt"="CXCR6","CD66b-plt"="CEACAM8","CD183-plt"="CXCR3","CD11c-plt"="ITGAX",
+                     "CD182-plt"="CXCR2","CD57"="B3GAT1","CD28-plt"="CD28","CD38-plt"="CD38","IgD-plt"="IGHD",
+                     "CD196-plt"="CCR6","CD44-plt"="CD44","HLA-DR-plt"="HLA-DRA",
+                     "CD45RA"="CD45RA","CD4"="CD4","CD8a"="CD8A","CD11b"="ITGAM")
+
+RNA2CYTOF<-names(CYTOF2RNA_FEATURES)
+names(RNA2CYTOF)<-as.vector(CYTOF2RNA_FEATURES)
+
+CYTOF2RNA_CELLTYPES<-c("CD4+T_Treg-like"="Treg","CD4+T Treg-like"="Treg","CD4+Tcm-like"="CD4 TEM","CD4+Tem"="CD4 TCM",
+                       "CD4+Tna"="CD4 Naive","CD57-_NK"="NK","CD57- NK"="NK","CD57+_NK"="NK","CD57+ NK"="NK","CD8+Teff"="CD8 CTL",
+                       "CD8+Tem"="CD8 TEM","CD8+Tna"="CD8 Naive","CD8+Tna-like"="CD8 TEM","cDC"="cDC2","Classical_Mono"="CD14 Mono",
+                       "Classical Mono"="CD14 Mono","DNT"="dnT","gdT"="gdT","Memory_B"="B memory","Memory B"="B memory",
+                       "Naive_B"="B naive","Naive B"="B naive","Non-classical_Mono"="CD16 Mono","Non-classical Mono"="CD16 Mono",
+                       "pDC"="pDC","Plasmablast"="Plasmablast")
 #::::::::: ::::#
 # I/O FUNCTIONS
 #:::::::::: :::#
+
+# Function: loom2Metacells
+# merge spliced and unspliced counts with seacell's metadata
+#
+##
+# upstream: runSeaCells.slurm, runSeaCellsBySampleByType.slurm, velocyto.array.slurm
+# downstream: 
+# dependency: getWholeDaySplicedData
+# caller: NSF
+##
+# speed:
+loom2Metacells<-function(individual,float.shrinking.ratio=0.04){
+  all.metadata.files=NULL
+  message("listing metacell metadata files ...")
+  
+  for (time in c("CT09","CT13","CT17","CT21","CT25","CT29")) {
+      sample_id=paste0(individual,"_",time)
+      seacell.dir.path=paste0("~/analysis/cellranger/",sample_id,"/outs/per_sample_outs/",sample_id,"/count/preparation_seacells/")
+      metadata.files=list.files(seacell.dir.path,pattern="*metadata.csv",recursive = T,full.names = T)
+      metadata.files=metadata.files[grepl(as.character(float.shrinking.ratio),metadata.files)]
+    if(is.null(all.metadata.files)){
+        all.metadata.files=metadata.files
+    }else{
+        all.metadata.files=c(all.metadata.files,metadata.files)
+    }
+  }
+  
+  assign("runtime.loom2Metacells.all.metadata.files",all.metadata.files,envir=.GlobalEnv)
+  metadata=NULL
+  for (file in all.metadata.files) {
+    this.metadata=read.csv(file)
+    if(is.null(metadata)){
+      metadata=this.metadata
+    }else{
+      metadata=rbind(metadata,this.metadata)
+    }
+  }
+  assign("runtime.loom2Metacells.metadata",metadata,envir=.GlobalEnv)
+  all.spliced=NULL
+  all.unspliced=NULL
+  message("start processing loom")
+
+  message(individual)
+  this.loom=getWholeDaySplicedData(individual)
+  this.seacells=metadata[grepl(individual,metadata$SEACell),"SEACell"] %>% unique()
+  i=0
+  for (this.seacell in this.seacells) {
+    i=i+1
+    if(i%%100==0){
+      message(paste0(i,"/",length(this.seacells)))
+    }
+    this.time=getField(this.seacell,"_",2)
+    this.singlecells=metadata[metadata$SEACell==this.seacell,"index"] %>% gsub("^TF_","",.)
+    if(length(this.singlecells)<=1){
+        next
+    }
+    this.spliced=rowSums(this.loom[[this.time]]$spliced[,this.singlecells])
+    used.index.spliced=(!duplicated(rownames(this.loom[[this.time]]$spliced)))
+    this.spliced=as.data.frame(this.spliced[used.index.spliced])
+    this.spliced=rownames_to_column(this.spliced,var = "geneName")
+    #assign("runtime.loom2Metacells.this.spliced",this.spliced,envir=.GlobalEnv)
+    #assign("runtime.loom2Metacells.used.index.spliced",used.index.spliced,envir=.GlobalEnv)
+    #rownames(this.spliced)=rownames(this.loom[[this.time]]$spliced)[used.index.spliced]
+    colnames(this.spliced)[2]=this.seacell
+      
+    used.index.unspliced=(!duplicated(rownames(this.loom[[this.time]]$unspliced)))
+    this.unspliced=rowSums(this.loom[[this.time]]$unspliced[,this.singlecells])
+    this.unspliced=as.data.frame(this.unspliced[used.index.unspliced])
+    this.unspliced=rownames_to_column(this.unspliced,var = "geneName")
+    #rownames(this.unspliced)=rownames(this.loom[[this.time]]$unspliced)[used.index.unspliced]
+    colnames(this.unspliced)[2]=this.seacell
+      
+    if(is.null(all.spliced)){
+      all.spliced=this.spliced
+    }else{
+      all.spliced=left_join(all.spliced,this.spliced,by="geneName")
+    }
+    
+    if(is.null(all.unspliced)){
+      all.unspliced=this.unspliced
+    }else{
+      all.unspliced=left_join(all.unspliced,this.unspliced,by="geneName")
+    }
+  }
+  
+  assign("runtime.loom2Metacells.all.spliced",all.spliced,envir = .GlobalEnv)
+  assign("runtime.loom2Metacells.all.unspliced",all.unspliced,envir = .GlobalEnv)
+  saveRDS(all.spliced,paste0("~/analysis/circadian/R/spliced.mecell/",individual,"_spliced.rds"))
+  saveRDS(all.unspliced,paste0("~/analysis/circadian/R/spliced.mecell/",individual,"_unspliced.rds"))
+}
 
 # Function: readAllMetaCell
 # create seurat object with metacell
@@ -272,13 +407,15 @@ readLSFromMetaCells<-function(path){
   return(res)
 }
 
-# Function: readJTKFromMetaCells
+# Function: readJTK
 # get all meta cell JTK result by individual
 # caller: NSF
 # dependency: getField
 # upstream: wrapper.testRhythmicity.R
 # downstream: 
-readJTKFromMetaCells<-function(path){
+##
+# historical name: readJTKFromMetaCells
+readJTK<-function(path){
   filesJTK=list.files(path,pattern = "JTKresult_*")
   res=NULL
   for(file in filesJTK){
@@ -333,7 +470,7 @@ readMergedJTK<-function(outpath,wanted.celltypes){
 # dependency: NSF
 # upstream: TypeCluster
 # downstream: <seurat>AddMetaData, <bash>runSeaCells.sh
-generateAnnotationFile<-function(TNK.file=NULL,B.file=NULL,Myeloid.file=NULL,Stem.file=NULL,full.file=NULL,cols,new.colnames=NULL,out.path='../analysis/cell.annotations.tsv'){
+generateAnnotationFile<-function(T.file=NULL,B.file=NULL,Myeloid.file=NULL,Stem.file=NULL,full.file=NULL,cols,new.colnames=NULL,out.path='../analysis/cell.annotations.tsv'){
   all.meta=NULL
   if(!is.null(full.file)){
     if(is.character(full.file)){
@@ -380,7 +517,7 @@ generateAnnotationFile<-function(TNK.file=NULL,B.file=NULL,Myeloid.file=NULL,Ste
 # downstream: mergeSplicedData (merge matrix of different time points into a single one)
 getWholeDaySplicedData<-function(patient_id,cells=NULL){
   res=list()
-  for(i in 1:6){
+  for(i in c("CT09","CT13","CT17","CT21","CT25","CT29")){
     sample_id=paste0(patient_id,"_",i)
     sample_loom_path=paste0(sample_id,"/outs/per_sample_outs/",sample_id,"/count/velocyto/")
     sample_loom_file_name=list.files(sample_loom_path)[1]
@@ -388,7 +525,7 @@ getWholeDaySplicedData<-function(patient_id,cells=NULL){
     message("loom file: ")
     message(sample_loom_full_path)
     loomMatrix=read.loom.matrices(sample_loom_full_path)
-    loomMatrix=subsetLoomMatrix(loomMatrix,cell.preffix=CT_TIME[i],cells=cells)
+    loomMatrix=subsetLoomMatrix(loomMatrix,cell.preffix=i,cells=cells)
     colnames(loomMatrix$spliced)=paste(patient_id,colnames(loomMatrix$spliced),sep='_')
     colnames(loomMatrix$unspliced)=paste(patient_id,colnames(loomMatrix$unspliced),sep='_')
     colnames(loomMatrix$ambiguous)=paste(patient_id,colnames(loomMatrix$ambiguous),sep='_')
@@ -469,34 +606,46 @@ mergeSamplesOneDay<-function(patient.id,data.path="/lustre/home/acct-medll/medll
 # caller: NSF
 # return merged srt
 mergeRawSamplesOneDay<-function(patient.id,data.path="/lustre/home/acct-medll/medll/data/cellranger_out/",save.each.sample=F,over.write=F,
-                                write.path="/lustre/home/acct-medll/medll/data/analysis/"){
+                                write.path="/lustre/home/acct-medll/medll/data/analysis/",addmodulescore=F,no.processing=F){
   srts=list()
   samples_file=paste0(patient.id,"_",1:6,".levelTop.rds")
   samples_file=paste0(write.path,samples_file)
   for(i in 1:6){
-    sample_id=paste0(patient.id,"_",i)
+    sample_id=paste0(patient.id,"_",CT_TIME[i])
     sprt_path=paste0(sample_id,"/outs/per_sample_outs/",sample_id,"/count/sample_filtered_feature_bc_matrix/")
     suffix=CT_TIME[i]
+    message(sprt_path)
     srt=seuratWrap1(sprt_path)
-    srt=seuratWrap2(srt)
-    srt=seuratWrap3(srt,res = 0.05)
-    srt=AddModuleScore(srt,list("T"=c("CD3D"),"NK"=c("GNLY"),"Plasma"=c("JCHAIN"),"B"=c("MS4A1"),
-                                "Myeloid"=c("CD14","FCN1"),"Stem"=c("CD34","THY1","ITGA2"),"Platelet"=c("PPBP"),"Granular"=c("CCR3","IL5RA"),
-                                "Plasmatoid"=c("LILRA4")))
-    colnames(srt@meta.data)[7:15]=c("T","NK","Plasma","B","Myeloid","Stem","Platelet","Granular","Plasmatoid")
-    srt@meta.data$type=NA
-    srt@meta.data$type.top.level=NA
-    for(j in 0:(levels(srt@meta.data$seurat_clusters) %>% length())-1){
-      srt@meta.data$type[srt@meta.data$seurat_clusters==j]=srt@meta.data[srt@meta.data$seurat_clusters==j,
-                      c("T","NK","Plasma","B","Myeloid","Stem","Platelet","Granular","Plasmatoid")] %>% colSums() %>% which.max() %>% names()
+    if(!no.processing){
+      srt=seuratWrap2(srt)
+      srt=seuratWrap3(srt,res = 0.05)
+    }
+    if(addmodulescore){
+      srt=AddModuleScore(srt,list("T"=c("CD3D"),"NK"=c("GNLY"),"Plasma"=c("JCHAIN"),"B"=c("MS4A1"),
+                                  "Myeloid"=c("CD14","FCN1"),"Stem"=c("CD34","THY1","ITGA2"),"Platelet"=c("PPBP"),"Granular"=c("CCR3","IL5RA"),
+                                  "Plasmatoid"=c("LILRA4")))
+      colnames(srt@meta.data)[7:15]=c("T","NK","Plasma","B","Myeloid","Stem","Platelet","Granular","Plasmatoid")
+      srt@meta.data$type=NA
+      srt@meta.data$type.top.level=NA
+      for(j in 0:(levels(srt@meta.data$seurat_clusters) %>% length())-1){
+        srt@meta.data$type[srt@meta.data$seurat_clusters==j]=srt@meta.data[srt@meta.data$seurat_clusters==j,
+                                                                           c("T","NK","Plasma","B","Myeloid","Stem","Platelet","Granular","Plasmatoid")] %>% colSums() %>% which.max() %>% names()
+      }
+      srt@meta.data[srt@meta.data$type %in% c("T","NK"),"type.top.level"]="TNK"
+      srt@meta.data[srt@meta.data$type %in% c("B","Plasma"),"type.top.level"]="B"
+      srt@meta.data[srt@meta.data$type %in% c("Granular","Myeloid","Plasmatoid"),"type.top.level"]="Myeloid"
+      srt@meta.data[srt@meta.data$type %in% c("Platelet"),"type.top.level"]="Platelet"
+      srt@meta.data[srt@meta.data$type %in% c("Stem"),"type.top.level"]="HSC"
     }
     srt@meta.data$CT=suffix
-    srt@meta.data$patient=patient.id
-    srt@meta.data[srt@meta.data$type %in% c("T","NK"),"type.top.level"]="TNK"
-    srt@meta.data[srt@meta.data$type %in% c("B","Plasma"),"type.top.level"]="B"
-    srt@meta.data[srt@meta.data$type %in% c("Granular","Myeloid","Plasmatoid"),"type.top.level"]="Myeloid"
-    srt@meta.data[srt@meta.data$type %in% c("Platelet"),"type.top.level"]="Platelet"
-    srt@meta.data[srt@meta.data$type %in% c("Stem"),"type.top.level"]="HSC"
+    srt@meta.data$individual=patient.id
+    srt@meta.data$sample=sample_id
+    message(Cells(srt)[1])
+    if(!grepl("^TF_",Cells(srt)[1])){
+      message(sample_id)
+      message("cell id prefix not found, adding")
+      srt=RenameCells(srt,new.names=paste0("TF_",sample_id,"_", colnames(srt)))
+    }
     if(save.each.sample){
       if(file.exists(samples_file[i])&&!over.write){
         stop("File exists, set over.write=T or change path.")
@@ -505,7 +654,7 @@ mergeRawSamplesOneDay<-function(patient.id,data.path="/lustre/home/acct-medll/me
     }
     srts[[i]]=srt
   }
-  res=merge(srts[[1]],srts[2:6],add.cell.ids=CT_TIME)
+  res=merge(srts[[1]],srts[2:6])
   return(res)
 }
 
@@ -1022,54 +1171,10 @@ plotSingleSplicedVersusUnspliced<-function(loom.matrix,feature=CIRCADIAN_GENES_M
 }
 
 #a clock like figure
-plotPhaseofCellType<-function(df=NULL,p.cutoff=0.01,celltypes=NULL,colors,out.dir="../analysis/OSgenePredict/",method="JTK",embeding="box"){
-  if(is.null(df)){
-    plotdata=data.frame(CycID=character(0),PhaseShift=numeric(0),type=character(0))
-  }else{
-    plotdata=df
-    if(method=="JTK"){
-      colnames(plotdata)[c(5,7)]=c("PhaseShift","type")
-    }else{
-      colnames(plotdata)[c(2,12)]=c("PhaseShift","type")
-    }
-  }
-  if(!is.null(celltypes)){
-    for(type in celltypes){
-      if(grepl("Temra/Teff",type)){
-        type_char=gsub("Temra/Teff","Temra#Teff",type)
-      }else{
-        type_char=type
-      }
-      if(method=="LS"){
-        file.path=paste0(out.dir,'LSresult_',type_char,".txt")
-        p.str="p"
-      }else if(method=="JTK"){
-        file.path=paste0(out.dir,'JTKresult_',type_char,".txt")
-        p.str="ADJ.P"
-      }else{
-        stop("Unknown method.")
-      }
-      if(file.exists(file.path)){
-        outdata=read.delim(file.path)
-        if(method=="JTK"){
-          phase=dplyr::filter(outdata,get(p.str)<=p.cutoff)[c(1,5)]
-          colnames(phase)[2]="PhaseShift"
-        }else if(method=="LS"){
-          phase=dplyr::filter(outdata,get(p.str)<=p.cutoff)[1:2]
-        }else{
-          stop("Unknown method.")
-        }
-        if(nrow(phase)==0){
-          plotdata=rbind(plotdata,data.frame(CycID=NA,PhaseShift=0,type=type))
-        }else{
-          phase$type=type
-          plotdata=rbind(plotdata,phase)
-        }
-      }else{
-        plotdata=rbind(plotdata,data.frame(CycID=NA,PhaseShift=0,type=type))
-      }
-    }
-  }
+plotPhaseofCellType<-function(df,colors,embeding="box"){
+  plotdata=df
+  colnames(plotdata)[which(colnames(plotdata)=="LAG")]="PhaseShift"
+  colnames(plotdata)[which(colnames(plotdata)=="celltype")]="type"
   print(head(plotdata))
   if(embeding=="box"){
     ggplot(plotdata)+geom_boxplot(aes(x=PhaseShift,y=type,fill=type),outlier.shape = NA,color=NA)+
@@ -1126,30 +1231,46 @@ plotCircadianGeneCount<-function(p.cutoff,celltypes,colors,out.dir="../analysis/
     xlab("number of circadian genes")+ylab("")+NoLegend()+coord_flip()
 }
 
-
-plotGeneExpressionHeatmapByCT<-function(srt,cell.type,gene.list=CIRCADIAN_GENES_MAIN,return.data=F){
+# function: plotGeneExpressionHeatmapByCT
+##
+# upstream: (any seurat object with column "CT"<char>, "individual"<char>, "type"<char> in their @meta.data)
+# downstream: NSF
+# dependency: NSF
+# caller: NSF
+plotGeneExpressionHeatmapByCT<-function(srt,cell.type,individual=NULL,gene.list=CIRCADIAN_GENES_MAIN,return.data=F){
   cell.list=rownames(srt@meta.data[srt@meta.data$type==cell.type,])
-  data=t(LayerData(srt,layer = "count",cells=cell.list,features=gene.list)) %>% as.data.frame()
+  srt=NormalizeData(srt,normalization.method = "RC",scale.factor=1000000)
+  data=t(LayerData(srt,layer = "data",cells=cell.list,features=gene.list)) %>% as.data.frame()
   data=rownames_to_column(data,var="cell_id")
   data=gather(data,key="genes",value="expression",-cell_id)
-  meta=srt@meta.data[data$cell_id %>% unique(),c("cell_id","CT")]
+  assign("runtime.plotGeneExpressionHeatmapByCT.cell.list",cell.list,envir=.GlobalEnv)
+  if(!("cell_id" %in% colnames(srt@meta.data))){
+    srt@meta.data$cell_id=rownames(srt@meta.data)
+  }
+  meta=srt@meta.data[data$cell_id %>% unique(),c("cell_id","CT","individual")]
   data=left_join(data,meta,by="cell_id")
-  print(head(data))
-  data=downsample(data,"CT")
-  data=data %>% group_by(genes,CT) %>% summarise(.,expression_all=log(sum(expression))+1)
-  plotdata=data %>% group_by(genes) %>% reframe(relative_expression=scale(expression_all))
-  plotdata$CT=data$CT
+  data=balanceObsevations(data,c("genes","individual"),"CT")
+  data=data %>% group_by(genes,CT,individual) %>% summarise(.,expression_all=log(sum(expression)+1))
+  assign("runtime.plotGeneExpressionHeatmapByCT.data",data,envir=.GlobalEnv)
+  plotdata=data %>% group_by(genes,individual) %>% mutate(relative_expression=(expression_all-mean(expression_all))/sd(expression_all))
+  if(!is.null(individual)){
+    plotdata=plotdata[plotdata$individual %in% individual,]
+  }
+  plotdata=plotdata %>% group_by(genes,CT) %>% mutate(median_z_score=median(relative_expression))
+  plotdata=plotdata[c("genes","CT","median_z_score")] %>% unique()
+  assign("runtime.plotGeneExpressionHeatmapByCT.plotdata",plotdata,envir=.GlobalEnv)
+  #plotdata$CT=data$CT
   #plotdata=data
   if(return.data){
     return(plotdata)
   }else{
     print(head(plotdata))
   }
-  
-  ggplot(plotdata)+geom_bin_2d(aes(x=genes,y=CT,fill=relative_expression))+
-   scale_fill_gradientn(colors = rev(brewer.pal(11,"RdBu")))+
-    scale_x_discrete(limits=gene.list)+scale_y_discrete(limits=rev(CT_TIME_ORDER))+
-    ylab("")+xlab("")+theme(axis.text.x=element_blank(),axis.ticks=element_blank(),legend.position = "top")
+  time_order=sort(unique(plotdata$CT))
+  ggplot(plotdata)+geom_tile(aes(x=genes,y=CT,fill=median_z_score),color="black")+
+   scale_fill_gradientn(colors = c("#2166AC","#67A9CF","#D1E5F0","#F7F7F7","#FDDBC7", "#EF8A62", "#B2182B"),)+
+    scale_x_discrete(limits=gene.list)+scale_y_discrete(limits=time_order)+
+    ylab("")+xlab("")+theme(axis.text.x=element_text(angle=60,hjust=1),axis.ticks=element_blank(),legend.position = "top")
 }
 
 #violin plot showing expression of genes by celltype
@@ -1158,14 +1279,14 @@ plotExpressionByCelltype<-function(int.srt,gene.list=CIRCADIAN_GENES_MAIN,colors
   data=FetchData(int.srt,vars=gene.list)
   data=rownames_to_column(data,var="observation")
   data=gather(data,key=feature,value=count,-observation)
-  meta=int.srt@meta.data[data$observation,c("patient","manual.level2")]
+  meta=int.srt@meta.data[data$observation,c("individual","type")]
   meta=rownames_to_column(meta,var="observation")
   data=left_join(data,meta,by="observation")
   data=dplyr::filter(data,count>0)
   print(head(data))
-  x.labels=data$manual.level2 %>% getField(.,"_",1) %>% unique() %>% sort()
+  x.labels=data$type %>% getField(.,"_",1) %>% unique() %>% sort()
   print(x.labels)
-  ggplot(data)+geom_violin(aes(x=manual.level2,y=count,fill=manual.level2))+scale_fill_manual(values=colors)+
+  ggplot(data)+geom_violin(aes(x=type,y=count,fill=type))+scale_fill_manual(values=colors)+
     scale_x_discrete(labels=x.labels)+facet_wrap(~feature)+
     theme(axis.ticks.x=element_blank(),axis.text.x=element_text(angle=60,hjust=1),
     panel.background=element_rect(fill="white",color="black"),panel.grid = element_line(color="grey"),
@@ -1344,7 +1465,7 @@ plotRhythmicityPvalue<-function(celltypes,p.cutoff=1,features=CIRCADIAN_GENES_MA
 # upstream: readAllMetaCell, metacell2srt
 # dependency: fetchMergedDataOneCellType, getField
 # caller: NSF
-plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dist=T,droplet.mode=F,float.alpha=0.25,metacell.mode=T,internal_control="nCount_RNA",merge=T){
+plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dist=T,droplet.mode=F,float.alpha=0.25,metacell.mode=T,internal_control="CDK4",merge=T,phase.adjust=NULL){
   data=fetchMergedDataOneCellType(srt,cell.type=cell.type,gene.list=feature,CT_field=3,patient_filed = c(1,2),layer=layer,filter_data=F)
   if(droplet.mode){
     data$time=as.vector(srt$CT[data$observation])
@@ -1353,7 +1474,7 @@ plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dis
   if(metacell.mode){
     control=srt[["meta.cell.size"]] %>% as.data.frame()
   }else{
-    control=LayerData(srt,layer = "count",feature="CDK4") %>% as.data.frame() %>% t %>% as.data.frame()
+    control=LayerData(srt,layer = "count",feature=internal_control) %>% as.data.frame() %>% t %>% as.data.frame()
     colnames(control)[1]="control_expression"
   }
   control=rownames_to_column(control,var = "observations")
@@ -1370,6 +1491,23 @@ plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dis
   data=data %>% mutate(relative_q25=quantile(relative_expression,na.rm=T)[2],
                        relative_q75=quantile(relative_expression,na.rm=T)[4],
                        relative_median=median(relative_expression))
+  if(!is.null(phase.adjust)){
+    phase.adjust=phase.adjust[phase.adjust$celltype==cell.type&phase.adjust$CycID==feature,]
+    print(phase.adjust$LAG %>% table())
+    phase.prevalent=phase.adjust$LAG %>% table() %>% which.max() %>% names() %>% as.numeric()
+    phase.adjust$delta.phase=phase.prevalent-phase.adjust$LAG
+    phase.adjust=phase.adjust[c("individual","delta.phase")]
+    phase.adjust$individual=paste0("TF_",phase.adjust$individual)
+    colnames(phase.adjust)[1]="patient"
+    print(head(phase.adjust))
+    data=data[data$patient %in% phase.adjust$patient,]
+    data=left_join(data,phase.adjust,by="patient")
+    data$adjusted.time_numeric=data$time_numeric+data$delta.phase
+    data$adjusted.time_numeric=ifelse(data$adjusted.time_numeric<9,data$adjusted.time_numeric+24,data$adjusted.time_numeric)
+    data$adjusted.time_numeric=ifelse(data$adjusted.time_numeric>35,data$adjusted.time_numeric-24,data$adjusted.time_numeric)
+    data$time=ifelse(data$adjusted.time_numeric<10,paste0("CT0",data$adjusted.time_numeric),
+                     paste0("CT",data$adjusted.time_numeric))
+  }
   print(head(data))
   if(layer=="data"){
     if(merge){
@@ -1377,12 +1515,12 @@ plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dis
         geom_rect(xmin = "CT17", xmax = "CT29", ymin = -Inf, ymax = Inf,fill = "gray", alpha = 0.1)+
         geom_boxplot(aes(x=time,y=relative_expression),outlier.alpha=0,fill="lightblue")+
         ggtitle(paste0(cell.type,": ",feature))+theme_classic()+theme(axis.text.x=element_text(angle=60,hjust=1))+
-        ylab("z-score")+xlab("")
+        ylab("z-score")+xlab("")+scale_x_discrete(limits=sort(c(unique(data$time),"CT33")))
     }else{
       ggplot(data)+geom_boxplot(aes(x=time,y=values),outlier.alpha=0)+
         geom_jitter(aes(x=time,y=values),alpha=float.alpha)+facet_wrap(~patient,scale="free_y",ncol=4)+
         ggtitle(paste0(cell.type,": ",feature))+theme_bw()+theme(axis.text.x=element_text(angle=60,hjust=1))+
-        ylab("normalized expression")
+        ylab("normalized expression")+scale_x_discrete(limits=sort(c(unique(data$time),"CT33")))
     }
   }else{
     if(merge){
@@ -1390,18 +1528,20 @@ plotMetaCellByIndividual<-function(srt,cell.type,feature,layer="counts",norm.dis
         geom_rect(xmin = "CT17", xmax = "CT29", ymin = -Inf, ymax = Inf,fill = "gray", alpha = 0.1)+
         geom_boxplot(aes(x=time,y=relative_expression),outlier.alpha=0,fill="lightblue")+
         ggtitle(paste0(cell.type,": ",feature))+theme_classic()+theme(axis.text.x=element_text(angle=60,hjust=1))+
-        ylab("z-score")+xlab("")
+        ylab("z-score")+xlab("")+scale_x_discrete(limits=sort(c(unique(data$time),"CT33")))
     }else{
       ggplot(data)+geom_boxplot(aes(x=time,y=normalized),outlier.alpha=0)+
       geom_jitter(aes(x=time,y=normalized),alpha=float.alpha)+facet_wrap(~patient,scale="free_y",ncol=4)+
       ggtitle(paste0(cell.type,": ",feature))+theme_bw()+theme(axis.text.x=element_text(angle=60,hjust=1))+
-      ylab("normalized expression")
+      ylab("normalized expression")+scale_x_discrete(limits=sort(c(unique(data$time),"CT33")))
     }
   }
 }
 
-plotPseudobulkByCTByIndividual<-function(srt,cell.type,features,individuals=NULL,normalize.data=F,time.points=CT_TIME_ORDER,
-                                         return.data=F,proportion=1,split.by="no",layer="count",relative=T,log=F,plot="raw"){
+# function: plotRandomPseudobulkByCTByIndividual
+# historical name: plotPseudobulkByCTByIndividual
+plotRandomPseudobulkByCTByIndividual<-function(srt,cell.type,features,individuals=NULL,normalize.data=F,time.points=CT_TIME_ORDER,
+                                         return.data=F,proportion=1,split.by="no",layer="count",relative=T,log=F,plot="raw",float.alpha=0){
   data=fetchMergedDataOneCellType(srt,cell.type=cell.type,gene.list=features,CT_field=3,patient_filed = c(1,2),layer=layer,filter_data=F)
   print(head(data))
   if(is.null(individuals)){
@@ -1487,14 +1627,18 @@ plotPseudobulkByCTByIndividual<-function(srt,cell.type,features,individuals=NULL
   }
   print(head(plotdata))
   if(split.by=="individual"){
+    if(plot=="raw"){
       ggplot(plotdata)+geom_line(aes(x=time,y=relative_expression,group=feature))+
-        geom_point(aes(x=time,y=relative_expression,size=count,color=feature))+
+        geom_point(aes(x=time,y=relative_expression,size=count,color=feature),alpha=float.alpha)+
         scale_x_discrete(limits=time.points)+scale_color_manual(values=generateColor(length(features)))+
         facet_wrap(~individual,scales="free_y")+guides(size=guide_legend(title="UMI count"))+ggtitle(paste0(cell.type))
+    }else{
+      stop("plot not available")
+    }
   }else{
     if(plot=="raw"){
       ggplot(plotdata)+geom_line(aes(x=time,y=relative_expression,group=individual))+
-        geom_point(aes(x=time,y=relative_expression,size=count,color=feature),alpha=0.5)+
+        geom_point(aes(x=time,y=relative_expression,size=count,color=feature),alpha=float.alpha)+
         scale_x_discrete(limits=time.points)+scale_color_manual(values=generateColor(length(features)))+
         facet_wrap(~feature,scales="free_y")+guides(size=guide_legend(title="UMI count"))+ggtitle(paste0(cell.type))+ylab("z-score")
     }else if(plot=="errorbar"){
@@ -1521,6 +1665,169 @@ plotPseudobulkByCTByIndividual<-function(srt,cell.type,features,individuals=NULL
       message("unsupported plot type, supporting: raw/errorbar")
     }
   }
+}
+
+# function: plotPseudobulk
+##
+# upstream: 
+# downstream: NSF
+# caller: NSF
+# dependency: getExpressionZscores
+plotPseudobulk<-function(S4.srt,char.cell.type,vector.features,vector.individual=NULL,bool.normalize.data=T,char.data.from.mat=NULL,bool.debug=F,
+                         bool.renormalize.seurat=F,bool.relative=F,char.melatonin.file=NULL,char.cortisol.file=NULL){
+  mat=getExpressionZscores(S4.srt=S4.srt,char.cell.type=char.cell.type,vector.features=vector.features,vector.individual=vector.individual,bool.normalize.data=bool.normalize.data,
+                           char.data.from.mat=char.data.from.mat,bool.debug=bool.debug,bool.renormalize.seurat=bool.renormalize.seurat,
+                           bool.relative=bool.relative,char.melatonin.file=char.melatonin.file,char.cortisol.file=char.cortisol.file)
+  if(bool.debug){
+    assign("runtime.plotPseudobulk.mat.final",mat,envir=.GlobalEnv)
+  }
+  char.scales=NULL
+  if(bool.relative){
+    char.scales="fixed"
+  }else{
+    char.scales="free_y"
+  }
+  ylab.used=NULL
+  if(bool.normalize.data){
+    ylab.used="CPM"
+  }else{
+    ylab.used="raw count"
+  }
+  
+  if(bool.relative){
+    ylab.used="z-score"
+  }
+  
+  ggplot(mat)+geom_rect(xmin = "CT17", xmax = "CT29", ymin = -Inf, ymax = Inf,fill = "gray", alpha = 0.1)+
+    geom_point(aes(x=CT,y=values,color=features))+
+    geom_point(data=mat[mat$status=="sleep",],aes(x=CT,y=values),shape=21,color="red",size=3,stroke=1)+
+    geom_line(aes(x=CT,y=values,color=features,group=features))+scale_y_continuous(n.breaks = 5)+
+    scale_x_discrete(limits=CT_TIME_ORDER_FINE)+facet_wrap(~individual,scales=char.scales)+
+    scale_color_d3("category20")+ggtitle(paste0(paste(vector.features,collapse = "_"),"-",char.cell.type))+
+    theme(axis.text.x=element_text(angle=60,hjust=1),panel.background=element_rect(fill="white"))+ylab(ylab.used)
+}
+
+# function: getExpressionZscores
+##
+# upstream: 
+# downstream: NSF
+# caller: plotPseudobulk
+# dependency: NSF
+getExpressionZscores<-function(S4.srt=NULL,char.cell.type,vector.features,vector.individual=NULL,bool.normalize.data=T,char.data.from.mat=NULL,bool.debug=F,
+                         bool.renormalize.seurat=F,bool.relative=T,char.melatonin.file=NULL,char.cortisol.file=NULL){
+  
+  mat=NULL
+  
+  if(is.null(char.data.from.mat)&!is.null(S4.srt)){
+    target.cells=NULL
+    if(is.null(vector.individual)){
+      target.cells=rownames(S4.srt@meta.data[S4.srt$type==char.cell.type,])
+    }else{
+      target.cells=rownames(S4.srt@meta.data[S4.srt$type==char.cell.type&
+                                               S4.srt$individual %in% vector.individual,])
+    }
+    if(bool.normalize.data){
+      if(bool.renormalize.seurat){
+        S4.srt=NormalizeData(S4.srt,normalization.method = "RC",scale.factor = 1000000)
+      }
+      mat=as.data.frame(LayerData(S4.srt,cells=target.cells,features=vector.features,layer="data"))
+      gc()
+      mat=rownames_to_column(mat,var = "features")
+      mat=gather(mat,key="observations",value="counts",-features)
+      mat$CT=getField(mat$observations,"_",3)
+      mat$individual=getField(mat$observations,"_",2)
+      mat=mat %>% group_by(features,CT,individual) %>% mutate(count.feature.pseudobulk=sum(counts))
+      #meta=S4.srt$nCount_RNA %>% as.data.frame()
+      #meta=rownames_to_column(meta,var="observations")
+      #colnames(meta)[2]="count.Acell"
+      mat$count.Acell=1000000
+      mat=mat %>% group_by(features,CT,individual) %>% mutate(count.pseudobulk=sum(count.Acell))
+      if(bool.debug){
+        assign("runtime.getExpressionZscores.mat.mid",mat,envir=.GlobalEnv)
+      }
+      mat$values=(mat$count.feature.pseudobulk/mat$count.pseudobulk)*1000000
+      mat=mat[mat$features %in% vector.features,]
+      mat=mat[c("features","CT","individual","values")] %>% unique() %>% as.data.frame()
+      
+      if(bool.debug){
+        assign("runtime.getExpressionZscores.meta",meta,envir=.GlobalEnv)
+        assign("runtime.getExpressionZscores.mat.mid2",mat,envir=.GlobalEnv)
+      }
+    }else{
+      mat=as.data.frame(LayerData(S4.srt,cells=target.cells,features=vector.features,layer="count"))
+      gc()
+      mat=rownames_to_column(mat,var = "features")
+      mat=gather(mat,key="observations",value="counts",-features)
+      mat$CT=getField(mat$observations,"_",3)
+      mat$individual=getField(mat$observations,"_",2)
+      mat=mat %>% group_by(features,CT,individual) %>% mutate(values=sum(counts))
+      mat=mat[mat$features %in% vector.features,]
+      mat=mat[c("features","CT","individual","values")] %>% unique() %>% as.data.frame()
+      
+      if(bool.debug){
+        assign("runtime.getExpressionZscores.mat.mid2",mat,envir=.GlobalEnv)
+      }
+    }
+  }else if(!is.null(char.data.from.mat)){
+    char.cell.type=gsub(" ","_",char.cell.type)
+    print(char.data.from.mat[1:3,1:3])
+    char.data.from.mat=char.data.from.mat[vector.features,]
+    individual.pat=NULL
+    if(!is.null(vector.individual)){
+      individual.pat=paste0(vector.individual,collapse = "|")
+      message(individual.pat)
+    }
+    char.data.from.mat=char.data.from.mat[,grepl(individual.pat,colnames(char.data.from.mat))]
+    char.data.from.mat=rownames_to_column(char.data.from.mat,"features")
+    mat=gather(char.data.from.mat,key="observations",value="values",-features)
+    mat$CT=getField(mat$observations,"-",2)
+    mat$individual=getField(mat$observations,"-",1)
+    mat$celltype=getField(mat$observations,"-",3)
+    print(head(mat))
+    mat=mat[mat$celltype==char.cell.type,]
+    mat=mat[c("features","CT","individual","values")] %>% as.data.frame()
+    mat=mat[!is.na(mat$values),]
+    print(head(mat))
+  }else{
+    stop("Either of S4.srt/char.data.from.mat must be provided.")
+  }
+
+  if(!is.null(char.melatonin.file)){
+    melatonin=readRDS(char.melatonin.file)
+    melatonin=melatonin[melatonin$individual!="WMY",c("CT","individual","Estimate")]
+    melatonin$features="melatonin"
+    colnames(melatonin)=c("CT","individual","values","features")
+    melatonin=melatonin[c("features","CT","individual","values")] %>% as.data.frame()
+    rownames(melatonin)=1:nrow(melatonin)
+    if(bool.debug){
+      assign("runtime.getExpressionZscores.melatonin",melatonin,envir=.GlobalEnv)
+    }
+    mat=rbind(mat,melatonin)
+  }
+  if(!is.null(char.cortisol.file)){
+    cortisol=readRDS(char.cortisol.file)
+    cortisol=cortisol[cortisol$individual!="WMY",c("CT","individual","Estimate")]
+    cortisol$features="cortisol"
+    colnames(cortisol)=c("CT","individual","values","features")
+    cortisol=cortisol[c("features","CT","individual","values")] %>% as.data.frame()
+    rownames(cortisol)=1:nrow(cortisol)
+    if(bool.debug){
+      assign("runtime.getExpressionZscores.cortisol",cortisol,envir=.GlobalEnv)
+    }
+    mat=rbind(mat,cortisol)
+  }
+  if(bool.relative){
+    mat$raw=mat$values
+    mat=mat %>% group_by(features,individual) %>% mutate(values=(log2(raw+1)-mean(log2(raw+1)))/sd(log2(raw+1)))
+    # for features that have 0 expression all the time, the z-score will be NA by default, so replace NA with 0
+    mat[is.na(mat$values),"values"]=0
+  }
+  mat$status=ifelse(mat$CT %in% c("CT25","CT27","CT29","CT31"),"sleep","wake")
+  #mat$features=factor(mat$features,levels=vector.features)
+  if(bool.debug){
+    assign("runtime.getExpressionZscores.mat.final",mat,envir=.GlobalEnv)
+  }
+  return(mat)
 }
 
 plotBatchByCT<-function(srt,cell.type,this.patient=PATIENTS[1],slot="counts"){
@@ -1626,7 +1933,9 @@ plotBatchByCT<-function(srt,cell.type,this.patient=PATIENTS[1],slot="counts"){
   ggarrange(plotlist = plots)
 }
 
-plotPseudobulkByCT<-function(srt,cell.type,features=CIRCADIAN_GENES_MAIN,return.data=F,rep=3,proportion=0.3,layer="count",normalize.data=F){
+# function: plotRandomPseudobulkByCT
+# historical name: plotPseudobulkByCT
+plotRandomPseudobulkByCT<-function(srt,cell.type,features=CIRCADIAN_GENES_MAIN,return.data=F,rep=3,proportion=0.3,layer="count",normalize.data=F){
   data=fetchMergedDataOneCellType(srt,cell.type=cell.type,gene.list=features,CT_field=3,patient_filed = c(1,2),layer = layer,filter_data=F)
   print(head(data))
   #patients=data$patient %>% table() %>% names()
@@ -1754,11 +2063,11 @@ predictCTofCells<-function(srt,features,cell.type){
 #vec: vector of string
 #sep: separator
 #field: wanted field
-getField<-function(vec,sep,field){
+getField<-function(vec,sep,field,fixed=T){
   if(length(field)>1){
-    strsplit(vec,sep,fixed=T) %>% lapply(.,`[`,field) %>% lapply(.,paste0,collapse=sep) %>% unlist()
+    strsplit(vec,sep,fixed=fixed) %>% lapply(.,`[`,field) %>% lapply(.,paste0,collapse=sep) %>% unlist()
   }else{
-    strsplit(vec,sep,fixed=T) %>% lapply(.,`[`,field) %>% unlist()
+    strsplit(vec,sep,fixed=fixed) %>% lapply(.,`[`,field) %>% unlist()
   }
 }
 
@@ -1796,8 +2105,8 @@ convertMouseGeneList<-function(x){
 #return a data frame, colnames are observations, features, values, time (CT), cell_type
 fetchMergedDataOneCellType<-function(merged.srt,gene.list=CIRCADIAN_GENES_MAIN,cell.type=NULL,CT_field=1,patient_filed=NULL,layer="data",filter_data=T){
   data=LayerData(merged.srt,layer=layer,cells=rownames(merged.srt@meta.data[merged.srt@meta.data$type==cell.type,]),features=gene.list) %>% t %>% as.data.frame()
-  #print(colnames(data))
-  #print(gene.list)
+  print(head(data))
+  print(gene.list)
   if(length(colnames(data))!=length(gene.list)){
     message(paste0("Gene ",setdiff(gene.list,colnames(data)))," not found in data.")
     gene.list=gene.list[gene.list %in% setdiff(gene.list,colnames(data))]
@@ -1813,6 +2122,8 @@ fetchMergedDataOneCellType<-function(merged.srt,gene.list=CIRCADIAN_GENES_MAIN,c
     data=data[data$values!=0,]
   }
   data$time_numeric=data$time %>% gsub("CT","",.) %>% as.numeric()
+  #print(head(data))
+  #print(cell.type)
   data$cell_type=cell.type
   return(data)
 }
@@ -1928,12 +2239,12 @@ detectCircadianGenesByPseudoBulk<-function(int.srt,features=CIRCADIAN_GENES_MAIN
     usecelltype.char=usecelltype
   }
   if(pseudobulk=="sampling"){
-    test.data=plotPseudobulkByCT(int.srt,features =features, cell.type = usecelltype,return.data = T,rep = rep,proportion = proportion)
+    test.data=plotRandomPseudobulkByCT(int.srt,features =features, cell.type = usecelltype,return.data = T,rep = rep,proportion = proportion)
     test.data=test.data[,c("feature","time","downsample","count")]
     test.data$downsample=paste0("Rep",test.data$downsample)
     test.data$colname.new=paste0(test.data$time,".",test.data$downsample)
   }else if(pseudobulk=="individual"){
-    test.data=plotPseudobulkByCTByIndividual(int.srt,features =features, cell.type = usecelltype,return.data = T)
+    test.data=plotRandomPseudobulkByCTByIndividual(int.srt,features =features, cell.type = usecelltype,return.data = T)
     test.data=test.data[,c("feature","time","individual","relative_expression")]
     test.data[is.na(test.data$relative_expression),"relative_expression"]=0
     colnames(test.data)[4]="count"
@@ -2321,16 +2632,33 @@ cateSub<-function(vector,categories.ori,categories.nov){
 
 # Function: srt2bulkMatrix
 # convert srt object to pseudo-bulk matrix, can split by up to 3 meta.data
+##
+# bool.use.CPHC: calculate counts per hundred cell instead of count per million (CPM)
+##
 # upstream: NSF
 # downstream: NSF
 # caller: generateCircadianMatBySample
 # dependency: NSF
-srt2bulkMatrix<-function(srt,split.by,layer="count",normalize=F){
+srt2bulkMatrix<-function(srt,split.by,layer="count",normalize=F,bool.use.CPHC=F){
+  if(bool.use.CPHC){
+    layer="count"
+    normalize=F
+  }
   res=NULL
   if(length(split.by)==1){
     reps=srt[[split.by]] %>% unique() %>% unlist() %>% as.vector()
     for(rep in reps){
       this.cells=rownames(srt@meta.data[srt@meta.data[split.by]==rep,])
+      if(length(this.cells)==0){
+        next
+      }
+      if(bool.use.CPHC){
+        if(length(this.cells)>=100){
+          this.cells=sample(this.cells,100)
+        }else{
+          this.cells=sample(this.cells,100,replace = T)
+        }
+      }
       df=LayerData(srt,cells=this.cells,layer=layer)%>% rowSums() %>% as.data.frame()
       colnames(df)=rep
       if(normalize){
@@ -2351,6 +2679,16 @@ srt2bulkMatrix<-function(srt,split.by,layer="count",normalize=F){
     for(rep1 in reps1){
       for(rep2 in reps2){
         this.cells=rownames(srt@meta.data[srt@meta.data[split.by[1]]==rep1&srt@meta.data[split.by[2]]==rep2,])
+        if(length(this.cells)==0){
+          next
+        }
+        if(bool.use.CPHC){
+          if(length(this.cells)>100){
+            this.cells=sample(this.cells,100)
+          }else{
+            this.cells=sample(this.cells,100,replace = T)
+          }
+        }
         df=LayerData(srt,cells=this.cells,layer=layer)%>% rowSums() %>% as.data.frame()
         new_colname=paste0(rep1,"-",rep2) %>% gsub(" ","_",.)
         colnames(df)=new_colname
@@ -2375,6 +2713,16 @@ srt2bulkMatrix<-function(srt,split.by,layer="count",normalize=F){
       for(rep2 in reps2){
         for(rep3 in reps3){
           this.cells=rownames(srt@meta.data[srt@meta.data[split.by[1]]==rep1&srt@meta.data[split.by[2]]==rep2&srt@meta.data[split.by[3]]==rep3,])
+          if(length(this.cells)==0){
+            next
+          }
+          if(bool.use.CPHC){
+            if(length(this.cells)>100){
+              this.cells=sample(this.cells,100)
+            }else{
+              this.cells=sample(this.cells,100,replace = T)
+            }
+          }
           df=LayerData(srt,cells=this.cells,layer=layer)%>% rowSums() %>% as.data.frame()
           new_colname=paste0(rep1,"-",rep2,"-",rep3) %>% gsub(" ","_",.)
           colnames(df)=new_colname
@@ -2470,7 +2818,7 @@ plotNetWorkCircadian<-function(srt,JTK.result.filtered,float.shared.ratio=0.05){
 plotRadarCellType<-function(srt,celltypes,feature,colors=generateColor(25)){
   plotdata=NULL
   for(celltype in celltypes){
-    this.data=plotPseudobulkByCTByIndividual(srt=srt,cell.type=celltype,features=feature,return.data = T)
+    this.data=plotRandomPseudobulkByCTByIndividual(srt=srt,cell.type=celltype,features=feature,return.data = T)
     this.data=this.data[c("time","CT_median")] %>% unique()
     this.data$cell.type=celltype
     if(is.null(plotdata)){
@@ -2662,7 +3010,7 @@ plotEnrichGObyCT<-function(JTK.result,type,threshold.ADJ.P=0.05,PER.floor=20,PER
 # downstream: NSF
 # caller: NSF
 # dependency: NSF
-plotPeakAmongIndividuals<-function(result,gene,float.barlength=0.1){
+plotPeakAmongIndividuals<-function(result,gene,float.barlength=0.1,by="type"){
   plotdata=result[result$CycID==gene,]
   if(nrow(plotdata)==0){
     stop("no data available")
@@ -2673,13 +3021,24 @@ plotPeakAmongIndividuals<-function(result,gene,float.barlength=0.1){
     lag.char="PhaseShift"
   }
   plotdata$celltype=as.factor(plotdata$celltype)
-  ggplot(plotdata)+geom_vline(aes(xintercept=as.numeric(celltype)))+
-    geom_segment(aes(x=as.numeric(celltype)-float.barlength,xend=as.numeric(celltype)+float.barlength,y=get(lag.char),yend=get(lag.char),color=individual),size=2)+
+  plotdata2=plotdata[,lag.char] %>% table() %>% as.data.frame()
+  print(head(plotdata2))
+  colnames(plotdata2)[1]="peaking time"
+  plot1=ggplot(plotdata)+geom_bar(aes(x=celltype,y=23),stat="identity",fill="white",color="black")+
+    geom_hline(aes(yintercept=5),linetype="dashed")+geom_hline(aes(yintercept=10),linetype="dashed")+
+    geom_hline(aes(yintercept=15),linetype="dashed")+geom_hline(aes(yintercept=20),linetype="dashed")+
+    #geom_segment(aes(x=as.numeric(celltype)-float.barlength,xend=as.numeric(celltype)+float.barlength,y=get(lag.char),yend=get(lag.char),color=individual),size=2,alpha=0.75)+
+    geom_jitter(aes(x=celltype,y=get(lag.char),color=individual))+
     ylim(c(0,23))+scale_x_discrete(limits = levels(plotdata$celltype)) +
-    labs(x = "", y = "peaking time",title = paste0("phase of ",gene,"\namong individuals")) + scale_color_aaas()+
-    theme_minimal()+theme(axis.text.x = element_text(angle = 60, hjust = 1, color="black"),
-                          axis.text.y = element_text(color="black"),
+    labs(x = "", y = "peaking time",title = paste0("phase of ",gene)) + scale_color_d3(palette="category20")+
+    theme_minimal()+theme(text=element_text(size=12),axis.text.x = element_text(angle = 60, hjust = 1,vjust=1.1, color="black"),
+                          axis.text.y = element_text(color="black"),plot.margin=margin(10,0,0,10),
                           plot.title = element_text(hjust=0.5))+NoLegend()
+  plot2=ggplot(plotdata2)+geom_bar(aes(x=Freq,y=get("peaking time")),stat="identity",fill="grey",color="black",alpha=0.5)+ylim(seq(0,23,2) %>% as.character())+
+    theme(axis.text.y=element_blank(),axis.ticks.y=element_blank(),plot.margin=margin(0,10,0,0),axis.title.y=element_blank(),
+          axis.text.x=element_text(color="black"),
+          panel.background=element_rect(fill="white"))+ylab("")+xlab("")+labs(title="frequency")
+  ggarrange(plot1,plot2,ncol=2,nrow=1,align="h",widths=c(3,1))
 }
 
 # plotPhaseBetweenIndividuals
@@ -2820,10 +3179,10 @@ plotOscillatingGeneSummarise<-function(result,vec.plottype=NULL,x.axis="phase.co
     xlim=c(0,max(allplotdata[[x.axis]]))
   }
   ggplot(allplotdata[allplotdata$n.ocurrence>2,])+geom_point(aes(x=get(x.axis),y=get(y.axis),size=n.ocurrence,color=celltype),alpha=0.7)+
-    facet_wrap(~celltype,scales="free")+ylim(ylim)+xlim(xlim)+
+    facet_wrap(~celltype,scales="free")+ylim(ylim)+xlim(xlim)+scale_size_continuous(range = c(1,6))+
     geom_text_repel(data = allplotdata[allplotdata$n.ocurrence>4,],aes(x=get(x.axis),y=get(y.axis),label=CycID),hjust=1,vjust=1,max.overlaps=10,size=4)+
-    scale_color_manual(values=generateColor(length(unique(allplotdata$celltype)))[int.color.index])+labs(x=x.lab,y=y.lab)+
-    theme_minimal(base_size = 12)+theme(strip.text = element_text(size = 12))
+    scale_color_manual(values=generateColor(length(unique(result$celltype)))[int.color.index])+labs(x=x.lab,y=y.lab)+
+    theme_minimal(base_size = 12)+theme(strip.text = element_text(size = 12))+guides(color="none")
 }
 
 # Function: plotExpressionWithSoup
@@ -3073,4 +3432,365 @@ generateCircadianMatBySample<-function(srt.metacell,out.file,pooled.sample=F){
   }
   matBySample.nr[is.na(matBySample.nr$count),"count"]=0
   saveRDS(matBySample.nr,out.file)
+}
+
+
+# CytofFeather2SeuratObject
+# upstream: NSF
+# downstream: 
+# caller: NSF
+# dependency: NSF
+feather2SeuratObject<-function(file.path,meta.path){
+  
+  sample_mapping=c("L02251_FH0007"="KD_CT11","L02251_FH0006"="KD_CT15","L02251_FH0008"="KD_CT19","L02251_FH0009"="KD_CT23",
+                   "L02251_FH0010"="KD_CT27","L02251_FH0005"="KD_CT31","L02251_FH0004"="KD_CT35",
+                   "L02251_FH0011"="JJC_CT11","L02251_FH0012"="JJC_CT15","L02251_FH0013"="JJC_CT19","L02251_FH0014"="JJC_CT23",
+                   "L02251_FH0015"="JJC_CT27","L02251_FH0016"="JJC_CT31","L02251_FH0017"="JJC_CT35",
+                   "L02251_FH0018"="LYH_CT11","L02251_FH0019"="LYH_CT15","L02251_FH0020"="LYH_CT19","L02251_FH0021"="LYH_CT23",
+                   "L02251_FH0022"="LYH_CT27","L02251_FH0023"="LYH_CT31","L02251_FH0024"="LYH_CT35",
+                   "L02251_FH0025"="ZYR_CT11","L02251_FH0039"="ZYR_CT15","L02251_FH0027"="ZYR_CT19","L02251_FH0028"="ZYR_CT23",
+                   "L02251_FH0029"="ZYR_CT27","L02251_FH0030"="ZYR_CT31","L02251_FH0031"="ZYR_CT35",
+                   "L02251_FH0032"="WMY_CT11","L02251_FH0040"="WMY_CT15","L02251_FH0034"="WMY_CT19","L02251_FH0035"="WMY_CT23",
+                   "L02251_FH0041"="WMY_CT27","L02251_FH0042"="WMY_CT31","L02251_FH0038"="WMY_CT35"
+  )
+  
+  CytofRawCol=c("CD45_plt","CD3_plt","CD62L","TCR_g_d_plt","CD27",
+                "CD14_plt","CD195_plt","CD11a","CD15_plt","CD19_plt",
+                "CD25","CD192_plt","CD33_plt","CD16_plt","CD5","CD24_plt","CD185",
+                "CD184_plt","CD279_plt","CD197_plt","CD56_plt","CD194_plt","CX3CR1",
+                "CD123_plt","CD127","CD186_plt","CD66b_plt","CD183_plt",
+                "CD11c_plt","CD182_plt","CD57","CD28_plt","CD38_plt","IgD_plt",
+                "CD196_plt","CD44_plt","HLA_DR_plt","CD45RA","CD4","CD8a","CD11b")
+  data=read_feather(file.path) %>% as.data.frame()
+  meta=read_feather(meta.path) %>% as.data.frame()
+  rownames(meta)=meta$cell_id
+  meta$cell_id=NULL
+  
+  # Identify marker columns (proteins to be normalized)
+  marker_cols <- c("CD45_plt", "107Ag", "109Ag", "111Cd", "112Cd", "113In", "114Cd", 
+                   "CD3_plt", "116Cd", "139La", "140Ce", "CD62L", "TCR_g_d_plt", 
+                   "CD27", "CD14_plt", "CD195_plt", "CD11a", "CD15_plt", "CD19_plt", 
+                   "CD25", "CD192_plt", "CD33_plt", "CD16_plt", "CD5", "CD24_plt", 
+                   "CD185", "CD184_plt", "CD279_plt", "CD197_plt", "CD56_plt", 
+                   "CD194_plt", "CX3CR1", "CD123_plt", "CD127", "CD186_plt", 
+                   "CD66b_plt", "CD183_plt", "167Er", "CD11c_plt", "CD182_plt", 
+                   "CD57", "CD28_plt", "CD38_plt", "IgD_plt", "CD196_plt", 
+                   "CD44_plt", "HLA_DR_plt", "CD45RA", "CD4", "CD8a", "CD11b")
+  
+  # Identify non-marker columns (metadata)
+  non_marker_cols <- c("cell_id", "Time", "Event_length", "102Pd", "103Rh", 
+                       "104Pd_104_barcode", "105Pd_105_barcode", "106Pd_106_barcode", 
+                       "108Pd_108_barcode", "110Pd_110_barcode", "191Ir_DNA1", 
+                       "193Ir_DNA2", "194Pt_cisplatin", "196Pt", "Center", 
+                       "Offset", "Width", "Residual", "Event #")
+  all_signal_cols<-c(marker_cols,non_marker_cols)
+  all_signal_cols<-all_signal_cols[!(all_signal_cols %in% c("cell_id", "Time", "Event_length","Center", 
+                                                            "Offset", "Width", "Residual", "Event #"))]
+  
+  # Apply arcsinh transformation with cofactor 5 (standard for CyTOF)
+  data_normalized <- data
+  #data_normalized[, marker_cols] <- asinh(data[, marker_cols] / 5)
+  
+  # Calculate mean and standard deviation
+  mean_length <- mean(data_normalized$Event_length)
+  sd_length <- sd(data_normalized$Event_length)
+  
+  # Set thresholds (typically ±2-3 SD from mean)
+  lower_threshold <- mean_length - (2 * sd_length)
+  upper_threshold <- mean_length + (2 * sd_length)
+  
+  # Filter events
+  filtered_data <- data_normalized[data_normalized$Event_length >= lower_threshold & 
+                                     data_normalized$Event_length <= upper_threshold, ]
+  
+  filtered_data=filtered_data[c("cell_id",all_signal_cols)]
+  rownames(filtered_data)<-filtered_data$cell_id
+  filtered_data$cell_id<-NULL
+  
+  shared_cell_id=intersect(rownames(meta),rownames(filtered_data))
+  filtered_data=filtered_data[shared_cell_id,]
+  meta=meta[shared_cell_id,]
+  srt=CreateSeuratObject(t(filtered_data),meta.data = meta)
+  srt@meta.data$sample=sample_mapping[srt@meta.data$sample]
+  return(srt)
+}
+
+# function: plotCytofbyIndividual
+# upstream: feather2SeuratObject
+# downstream: wrapper.testRhythmicity.R
+# caller: NSF
+# dependency: fetchMergedDataOneCellType
+plotCytofbyIndividual<-function(srt,cell.type,features,proportion=0.1){
+  features_rna=features
+  features=RNA2CYTOF[features]
+  data=fetchMergedDataOneCellType(srt,cell.type=cell.type,gene.list=features,CT_field=3,patient_filed = c(1,2),layer="count",filter_data=F)
+  print(head(data))
+  individuals=unique(data$patient)
+  plotdata=NULL
+  for(individual in individuals){
+    message("looping ..")
+    message(individual)
+    #pmeta=srt@meta.data[srt@meta.data$patient==individual,c("nCount_RNA","CT")] %>% downsample(.,"CT") %>% 
+    #  group_by(CT) %>% summarise(sum=sum(nCount_RNA))
+    #pmeta$min=min(pmeta$sum)
+    #pmeta$normalize_cof=pmeta$sum/pmeta$min
+    #colnames(pmeta)[1]="time"
+    for(feature in features){
+      block_data=dplyr::filter(data,features==feature,patient==individual)
+      block_data_min_cell_count=min(table(block_data$time))
+      block_data=rbind(block_data,data.frame(observations=rep("pseudo",block_data_min_cell_count*proportion),
+                                             features=rep(feature,block_data_min_cell_count*proportion),
+                                             values=rep(0,block_data_min_cell_count*proportion),
+                                             time=rep("CTpseudo",block_data_min_cell_count*proportion),
+                                             patient=rep("pseudo",block_data_min_cell_count*proportion),
+                                             time_numeric=rep("pseudo",block_data_min_cell_count*proportion),
+                                             cell_type=rep(cell.type,block_data_min_cell_count*proportion)))
+      block_data=downsample(block_data,"time")
+      internal_control_counts=NULL
+      
+      #block_data=block_data %>% group_by(.,time) %>% summarise(.,count=sum(values))
+      block_data=block_data[block_data$time!="CTpseudo",]
+
+      block_data$feature=feature
+      block_data$individual=individual
+
+      block_data$cell_count=block_data_min_cell_count
+      if(is.null(plotdata)){
+        plotdata=block_data
+      }else{
+        plotdata=rbind(plotdata,block_data)
+      }
+    }
+  }
+  print(head(plotdata))
+  features=gsub("-plt","",features)
+  plotdata=plotdata %>% group_by(feature,patient) %>% mutate(z_score=(values-mean(values))/sd(values))
+  ggplot(plotdata)+geom_boxplot(aes(x=time,y=values))+facet_wrap(~patient)+theme_half_open()+
+    theme(axis.text.x = element_text(angle=60,hjust=1))+ggtitle(paste0(features_rna," (",features,")"))+scale_x_discrete(limits=CT_TIME_ORDER_FINE)
+}
+
+# function: predictIndividualwithTauFisher
+##
+# data: output from srt2bulkMatrix, conflict with 'matrix.train' & 'matrix.predict', binded with 'individual' & 'celltype'
+# matrix.train & matrix.predict: output from wrapper.testRhythmicity.R, 
+# which was the count matrix for rhythmicity test, conflict with 'data'
+##
+# upstream: srt2bulkMatrix, wrapper.testRhythmicity.R
+# downstream: NSF
+# caller: NSF
+# dependency: getField
+predictIndividualwithTauFisher<-function(data=NULL,individual=NULL,celltype=NULL,matrix.train=NULL,matrix.predict=NULL,predictor.genes,return.res=F,diff_allow=4){
+  calc_error<-function (truth, pred, diff_allow) {
+    truth_24 = truth - 24 * floor(truth/24)
+    diff = truth_24 - pred
+    for (i in 1:length(diff)) {
+      if (diff[i] > 12) {
+        diff[i] = diff[i] - 24
+      }
+      else {
+        if (diff[i] < -12) 
+          diff[i] = diff[i] + 24
+      }
+    }
+    rmse = sqrt(mean(diff^2))
+    acceptable = ifelse(abs(diff) <= diff_allow, 1, 0)
+    acceptable_pct = sum(acceptable)/length(acceptable)
+    d_df = data.frame(truth = truth, truth_24 = truth_24, predicted = pred, 
+                      differences = diff)
+    return(list(differences = d_df, RMSE = rmse, Accuracy = acceptable_pct))
+  }
+  
+  if(!is.null(data)&!is.null(individual)&!is.null(celltype)){
+    if(length(individual)>1){
+      individual_pattern=paste0(individual,collapse = "|")
+    }else{
+      individual_pattern=individual
+    }
+    mat.train=data[,grepl(individual_pattern,colnames(data))&grepl(celltype,colnames(data))]
+    mat.train=mat.train[,order(colnames(mat.train))]
+    mat.train=mat.train[,colSums(mat.train)!=0]
+    mat.train=t(mat.train[predictor.genes,])
+    mat.train=log2(mat.train+1)
+    time_adj=getField(rownames(mat.train),'-',2) %>% gsub("CT0","",.) %>% gsub("CT","",.) %>% as.numeric()
+    rownames(mat.train)=time_adj
+    n.total=nrow(mat.train)
+    n.rep=length(unique(getField(rownames(mat.train),'-',2)))
+    message(paste0(n.rep," replications for each time point, totally ",n.total," points"))
+    
+    mat.predict=data[,grepl(celltype,colnames(data))&!grepl(individual_pattern,colnames(data))]
+    mat.predict=mat.predict[,colSums(mat.predict)!=0]
+    mat.predict=t(mat.predict[predictor.genes,])
+    mat.predict=log2(mat.predict+1)
+    time_truth=getField(rownames(mat.predict),'-',2) %>% gsub("CT0","",.) %>% gsub("CT","",.) %>% as.numeric()
+  }else if(!is.null(matrix.train)&!is.null(matrix.predict)){
+    # process training data
+    mat.train=read.delim(matrix.train)
+    rownames(mat.train)=mat.train$geneSymbol
+    mat.train$geneSymbol=NULL
+    mat.train=t(mat.train)
+    #mat.train=(mat.train %>% proportions(margin=1))*1000000
+    mat.train=mat.train[,predictor.genes]
+    mat.train=log2(mat.train+1)
+    mat.train[is.na(mat.train)]=0
+    time_adj=getField(rownames(mat.train),'.',1) %>% gsub("CT0","",.) %>% gsub("CT","",.) %>% as.numeric()
+    n.total=nrow(mat.train)
+    n.rep=length(unique(getField(rownames(mat.train),'.',2)))
+    message(paste0(n.rep," replications for each time point, totally ",n.total," points"))
+    rownames(mat.train)=time_adj
+    
+    # start process data waiting for predict
+    mat.predict=read.delim(matrix.predict)
+    rownames(mat.predict)=mat.predict$geneSymbol
+    mat.predict$geneSymbol=NULL
+    mat.predict=t(mat.predict)
+    #mat.predict=(mat.predict %>% proportions(margin=1))*1000000
+    mat.predict=mat.predict[,predictor.genes]
+    mat.predict=log2(mat.predict+1)
+    mat.predict[is.na(mat.predict)]=0
+    time_truth=getField(rownames(mat.predict),'.',1) %>% gsub("CT0","",.) %>% gsub("CT","",.) %>% as.numeric()
+  }else{
+    stop("argument missing, check arguments, 'data', 'individual', 'celltype' is binded, else provide both 'matrix.train' and 'matrix.predict'")
+  }
+
+
+  assign("runtime.predictIndividualwithTauFisher.mat.train",mat.train,envir = .GlobalEnv)
+  assign("runtime.predictIndividualwithTauFisher.mat.predict",mat.predict,envir = .GlobalEnv)
+  #print(head(mat.train))
+  
+  #mat.train=log2(mat.train+1)
+  #print(time_adj)
+  
+  # start run functional data analysis
+  #run FDA
+  fda_expression = get_FDAcurves(dat=mat.train, 
+                                 time=time_adj, 
+                                 numbasis=5) %>%
+    dplyr::mutate(time_24 = fda_time - 24*floor(fda_time/24)) %>%
+    dplyr::mutate(time_label = paste0(time_24, "_",
+                                      rep((max(n.rep)+1):(max(n.rep)+max(n.rep)),
+                                          each = 24, length = nrow(.))))
+  fda_expression=fda_expression[!duplicated(fda_expression$time_label),]
+  assign("runtime.predictIndividualwithTauFisher.fda_expression",fda_expression,envir = .GlobalEnv)
+  #print(fda_expression)
+  new_fda_rownames = fda_expression$time_label
+  # Remove the unnecessary columns
+  fda_expression2 = fda_expression[, -c(1, ncol(fda_expression)-1, ncol(fda_expression))]
+  # Create the differences matrix and scale
+  fda_diff=create_DiffMatrix(genes=predictor.genes, dat=fda_expression2)
+  assign("runtime.predictIndividualwithTauFisher.fda_diff",fda_diff,envir = .GlobalEnv)
+  fda_diff_scaled = scale_DiffMatrix(diffs=fda_diff)
+  
+  fda_mat = as.matrix(fda_diff_scaled)
+  #print(head(fda_mat))
+  #run PCA
+  # Set up train data for PCA
+  train=fda_mat
+  rownames(train)=new_fda_rownames
+  train_time=fda_expression$time_24
+  
+  # PCA
+  X_PCA<-train
+  X_PCA<-as.data.frame(X_PCA)
+  X_PCA$CT<-train_time
+  
+  pc<-stats::prcomp(X_PCA[, -ncol(X_PCA)], scale = FALSE)
+  
+  #Run multinomial regression
+  ndims = 2
+  pc_data<-data.frame(pc$x[,1:ndims])
+  
+  # Get the times and relevel them so the smallest CT is the reference level
+  assign("runtime.predictIndividualwithTauFisher.pc_data",pc_data,envir = .GlobalEnv)
+  pc_data$CT24<-as.numeric(vapply(stringr::str_split(rownames(pc_data), pattern = '_'),
+                                  '[', 1, FUN.VALUE = character(1) ))
+  pc_data$CT24_relevel<-stats::relevel(factor(pc_data$CT24),
+                                       ref = as.character(min(train_time)))
+  
+  mod <- nnet::multinom(CT24_relevel ~ PC1 + PC2, data = pc_data, trace=T)
+  
+  
+  #Calculate differences for each gene pair
+  mat.predict_diff <- create_DiffMatrix(genes=predictor.genes, dat=mat.predict)
+  assign("runtime.predictIndividualwithTauFisher.mat.predict_diff",mat.predict_diff,envir = .GlobalEnv)
+  mat.predict_diff_scaled = scale_DiffMatrix(diffs=mat.predict_diff)
+  
+  # Project data onto PCA space
+  pc_pred <- stats::predict(pc, newdata = mat.predict_diff_scaled)
+  
+  # Predict
+  pred_vals = stats::predict(mod, newdata = pc_pred[,1:ndims])
+  pred_vals = as.numeric(as.character(pred_vals))
+  
+  print(calc_error(truth=time_truth, pred=pred_vals,diff_allow=diff_allow))
+  if(return.res){
+    return(calc_error(truth=time_truth, pred=pred_vals,diff_allow=diff_allow))
+  }
+  if(!is.null(data)){
+    individuals=getField(rownames(pc_pred),"-",1)
+    CTs=getField(rownames(pc_pred),"-",2)
+    pc_pred=as.data.frame(pc_pred)
+    pc_pred$individual=individuals
+    pc_pred$CT=CTs
+    pc_pred$diff=calc_error(truth=time_truth, pred=pred_vals,diff_allow=diff_allow)$differences$differences
+    pc_pred$accurate=(abs(pc_pred$diff)<=2)
+    assign("runtime.predictIndividualwithTauFisher.pc_pred",pc_pred,envir = .GlobalEnv)
+    plot1=ggplot(pc_data)+geom_point(aes(x=PC1,y=PC2))+geom_text(aes(x=PC1,y=PC2,label=CT24),nudge_y = 0.1,size=3)+
+      geom_point(data=pc_pred,aes(x=PC1,y=PC2,color=individual))+
+      geom_text_repel(data=pc_pred,aes(x=PC1,y=PC2,label=CT,color=individual),nudge_y = 0.1,size=3)+
+      facet_wrap(~individual)+theme_half_open()+NoLegend()
+    plot2=ggplot(pc_pred)+geom_boxplot(aes(x=individual,y=diff))+theme_half_open()+NoLegend()+
+      theme(axis.text.x=element_blank(),axis.title.x=element_blank(),axis.ticks.x = element_blank())
+    plot3=ggplot(pc_pred)+geom_bar(aes(x=individual,fill=accurate),position="fill",color="black")+
+      scale_y_continuous(expand=c(0,0))+theme_half_open()+theme(axis.text.x=element_text(hjust=1,angle=60))
+    right=ggarrange(plot2,plot3,nrow=2,ncol=1,widths=c(1,1),common.legend = T)
+    ggarrange(plot1,right,nrow=1,ncol=2,widths=c(2,1))
+  }else{
+    pc_pred=as.data.frame(pc_pred)
+    pc_pred$CT=getField(rownames(pc_pred),".",1) %>% gsub("CT","",.)
+    assign("runtime.predictIndividualwithTauFisher.pc_pred",pc_pred,envir = .GlobalEnv)
+    ggplot(pc_data)+geom_point(aes(x=PC1,y=PC2))+geom_text(aes(x=PC1,y=PC2,label=CT24),nudge_y = 0.1)+
+      geom_point(data=pc_pred,aes(x=PC1,y=PC2,color=CT))
+  }
+}
+
+dimentionalReductionSubsetSrtCYTOF<-function(srt.sub,res=0.5,features=NULL,dims=1:20){
+  srt.sub=ScaleData(srt.sub)
+  if(is.null(features)){
+    srt.sub=RunPCA(srt.sub,features=Features(srt.sub))
+  }else{
+    srt.sub=RunPCA(srt.sub,features=features)
+  }
+  srt.sub=FindNeighbors(srt.sub,reduction = "pca",dims=dims)
+  srt.sub=FindClusters(srt.sub, resolution = res)
+  srt.sub=RunUMAP(srt.sub,dims=dims)
+  return(srt.sub)
+}
+
+# function: orderCellTypes
+## factorize vector of cell types from a column
+# upstream: NSF
+# downstream: NSF
+# caller: NSF
+# dependency: NSF
+orderCellTypes<-function(vector.input,reverse=F){
+  # replace "-" and "_" to " "
+  vector.input=gsub("-"," ",vector.input)
+  vector.input=gsub("_"," ",vector.input)
+  
+  if(reverse){
+    vector.input=factor(vector.input,levels=rev(c("CD14 Mono","CD16 Mono","cDC2","cDC1","pDC","ASDC",
+                                              "CD4 Naive", "CD4 TCM","CD4 TEM","CD4 CTL","Treg",
+                                              "CD8 Naive","CD8 TEM","CD8 TCM","MAIT","gdT",
+                                              "NK","NK CD56bright","dnT","ILC","CD4 Proliferating",
+                                              "CD8 Proliferating","NK Proliferating","B naive",
+                                              "B intermediate","B memory","Plasmablast")))
+  }else{
+    vector.input=factor(vector.input,levels=c("CD14 Mono","CD16 Mono","cDC2","cDC1","pDC","ASDC",
+                                              "CD4 Naive", "CD4 TCM","CD4 TEM","CD4 CTL","Treg",
+                                              "CD8 Naive","CD8 TEM","CD8 TCM","MAIT","gdT",
+                                              "NK","NK CD56bright","dnT","ILC","CD4 Proliferating",
+                                              "CD8 Proliferating","NK Proliferating","B naive",
+                                              "B intermediate","B memory","Plasmablast"))
+  }
+  return(vector.input)
 }

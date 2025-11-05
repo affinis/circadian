@@ -7,10 +7,10 @@
 ##
 # speed (n: number of smallest loop): n=340, t~=60 min; n=520, t~=80 min
 
-source('/tmpdata/LyuLin/script/circadian/circadian_core.R')
+source('~/script/circadian/circadian_core.R')
 library('DropletUtils')
 
-out.dir="/tmpdata/LyuLin/analysis/circadian/R/preparation_seacell_byType"
+out.dir="~/analysis/circadian/R/preparation_seacell_PseudoCellranger"
 if(!dir.exists(out.dir)){
   dir.create(out.dir)
 }
@@ -20,7 +20,7 @@ time_points<-c("CT11","CT15","CT19","CT23","CT27","CT31","CT35")
 individuals<-c("ZYR","JJC","KD","LYH")
 
 # specify input
-srt<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.annotated.clean.sct.Azimuth.rds')
+srt<-readRDS('~/analysis/circadian/R/16individual.srt.annotated.rds')
 srt$type<-srt$predicted.celltype.l2
 types<-unique(srt$type)
 
@@ -49,8 +49,10 @@ for(time_point in time_points){
       )
       
       # Create output directory
+      pseudo_cellranger_outdir=paste0(this.individual,"_",time_point,"/outs/per_sample_outs/",this.individual,"_",time_point,"/count/preparation_seacells/")
       output_dir=paste0(this.individual,"_",time_point,"_",gsub(" ","-",this.type),"_filtered_bc_matrix")
-      dir.create(output_dir, showWarnings = FALSE)
+      output_dir=paste0(pseudo_cellranger_outdir,output_dir)
+      dir.create(output_dir, showWarnings = FALSE,recursive = T)
       
       # Write files in Cell Ranger format
       write10xCounts(

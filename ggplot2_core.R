@@ -671,7 +671,7 @@ generateColor<-function(n,rgb.max=1,rgb.min=0.1,seed=2015,col.dist.min=0.5,alpha
       }else{
         j=j+1
         if(j>100000){
-          stop("col.dist.min too large to obtain enough colors, set it smaller")
+          stop(paste0("col.dist.min (",col.dist.min,") too large to obtain enough colors, set it smaller"))
         }else{
           next
         }
