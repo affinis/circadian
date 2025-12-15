@@ -13,8 +13,8 @@ source('~/script/circadian/circadian_core.R')
 #test$type<-test$predicted.celltype.l2
 #test<-NormalizeData(test,normalization.method = "RC",scale.factor = 1000000)
 
-JTK<-readRDS('~/analysis/circadian/R/JTK.result.filtered.16individual.addp2t.addfold2bkg.addmedianexp.bytype.rds')
-test.mat<-readRDS('~/analysis/circadian/R/16individual.pseudobulk.bytype.CPM.rds')
+JTK<-readRDS('~/analysis/core_data/JTK.result.filtered.16individual.addp2t.addfold2bkg.addmedianexp.bytype.rds')
+test.mat<-readRDS('~/analysis/core_data/16individual.pseudobulk.bytype.CPM.rds')
 
 all_result=NULL
 #for (this.individual in c("KD","ZYR","LYH","JJC")) {
@@ -22,15 +22,16 @@ all_result=NULL
     #message(paste0(this.individual,this.celltype,collapse = "-"))
     message(paste0(this.celltype,collapse = "-"))
     #this.features=as.data.frame(dplyr::filter(JTK,individual==this.individual,celltype==this.celltype))
-    this.features=as.data.frame(dplyr::filter(JTK,celltype==this.celltype))
-    if(nrow(this.features)==0){
-      next
-    }else{
-      this.features=unique(this.features$CycID)
+    #this.features=as.data.frame(dplyr::filter(JTK,celltype==this.celltype))
+    #if(nrow(this.features)==0){
+    #  next
+    #}else{
+      #this.features=unique(this.features$CycID)
+      this.features=rownames(test.mat)
       message(length(this.features))
       data=getExpressionZscores(S4.srt = NULL,char.cell.type=this.celltype,vector.features=this.features,vector.individual=c("KD","ZYR","LYH","JJC"),
-                                bool.normalize.data=T,bool.renormalize.seurat = F,char.melatonin.file='~/analysis/circadian/R/ELISA_melatonin.rds',
-                                char.cortisol.file = '~/analysis/circadian/R/ELISA_cortisol.rds',bool.relative = T,char.data.from.mat = test.mat)
+                                bool.normalize.data=T,bool.renormalize.seurat = F,char.melatonin.file='~/analysis/core_data/ELISA_melatonin.rds',
+                                char.cortisol.file = '~/analysis/core_data/ELISA_cortisol.rds',bool.relative = T,char.data.from.mat = test.mat)
       data.melatonin=data[data$features=="melatonin",c("CT","individual","values")]
       data.cortisol=data[data$features=="cortisol",c("CT","individual","values")]
       data.gene=data[!(data$features%in%c("cortisol","melatonin")),c("features","CT","individual","values")]
@@ -40,10 +41,10 @@ all_result=NULL
       
       data.final=left_join(data.gene,data.melatonin,by=c(c("CT","individual")))
       data.final=left_join(data.final,data.cortisol,by=c(c("CT","individual")))
-      data.final$individual=NULL
+      #data.final$individual=NULL
       print(head(data.final))
-      write.table(x = data.final,file="~/analysis/circadian/tmp/wrapper.calculateCorrelationWithHormones.tmp",quote = F,sep = '\t')
-      data.result=data.final %>% group_by(features) %>% summarise(cor2melatonin=cor.test(values,melatonin,method = "spearman")$estimate,p.value.melatonin=cor.test(values,melatonin,method = "spearman")$p.value,
+      write.table(x = data.final,file="~/analysis/tmp/wrapper.calculateCorrelationWithHormones.tmp",quote = F,sep = '\t')
+      data.result=data.final %>% group_by(features,individual) %>% summarise(cor2melatonin=cor.test(values,melatonin,method = "spearman")$estimate,p.value.melatonin=cor.test(values,melatonin,method = "spearman")$p.value,
                                                                              cor2cortisol=cor.test(values,cortisol,method = "spearman")$estimate,p.value.cortisol=cor.test(values,cortisol,method = "spearman")$p.value)
       data.result$celltype=this.celltype
       print(head(data.result))
@@ -52,8 +53,8 @@ all_result=NULL
       }else{
         all_result=rbind(all_result,data.result)
       }
-    }
+#    }
   }
 #}
 
-saveRDS(all_result,"~/analysis/circadian/R/Correlation.features2hormone.rds")
+saveRDS(all_result,"~/analysis/R/Correlation.features2hormone.byindividual.rds")

@@ -21,19 +21,20 @@ source('~/script/circadian/circadian_core.R')
 #}
 
 #srt.metacell<-readRDS('/tmpdata/LyuLin/analysis/circadian/R/seacell.0.08.bytype.rds')
-srt.metacell<-readRDS('~/analysis/circadian/R/7mixed.unspliced.metacell.srt.rds')
+srt.metacell<-readRDS('~/analysis/core_data/16individual.srt.annotated.rds')
 srt.metacell<-NormalizeData(srt.metacell,normalization.method = "RC",scale.factor = 1000000)
 #srt.metacell<-readRDS('~/analysis/circadian/R/CYTOF.300k.reannotation.srt.rds')
 
-
+use.pseudobulk<-T
 
 mat<-as.data.frame(LayerData(srt.metacell,layer = "data"))
-#srt.metacell$type<-srt.metacell$manual.new
+srt.metacell$type<-srt.metacell$predicted.celltype.l2
+#srt.metacell@meta.data$type<-CELL_TYPES2[srt.metacell@meta.data$predicted.celltype.l2.main]
 
 mat<-rownames_to_column(mat,"feature")
 exp_table<-gather(mat,key="observation",value="value",-feature)
 print(head(exp_table))
-out.dir<-"~/analysis/circadian/R/velosity.unspliced.meta2d.by.type/"
+out.dir<-"~/analysis/R/TypeLevelPseudobulk/"
 
 if(!dir.exists(out.dir)){
   dir.create(out.dir)
@@ -65,13 +66,20 @@ for (this.celltype in celltypes) {
     this.exp_table=dplyr::filter(this.exp_table,observation %in% downsample.table$observation)
     this.exp_table=arrange(this.exp_table,feature,CT,value)
     
-    if(length(downsample.table$CT %>% table())<7){
+    if(length(downsample.table$CT %>% table())<5){
       message("time points not enough")
       next
     }
     min.n=downsample.table$CT %>% table() %>% min
     print(downsample.table$CT %>% table())
-    if(min.n<3){
+    if(use.pseudobulk){
+      print(head(this.exp_table))
+      this.exp_table=this.exp_table %>% group_by(CT,feature,individual) %>% summarise(sum_value=sum(value))
+      colnames(this.exp_table)[4]="value"
+      min.n=1
+    }
+
+    if(min.n<3&!use.pseudobulk){
       message("n.observation not enough")
       next
     }
@@ -89,10 +97,16 @@ for (this.celltype in celltypes) {
 
     ##
     prefix=paste0(this.individual,"_",gsub(" ","_",this.celltype))
+    this.timepoints=NULL
+    if(this.individual %in% INDIVIDUALS_BATCH1){
+      this.timepoints=rep(c(9,13,17,21,25,29), each=min.n)
+    }else{
+      this.timepoints=rep(c(11,15,19,23,27,31,35), each=min.n)
+    }
     write.table(this.exp_table, file=paste0(out.dir,prefix,".txt"),
                 sep="\t", quote=FALSE, row.names=FALSE)
-    meta2d(infile=paste0(out.dir,prefix,".txt"), filestyle="txt",cycMethod = c("JTK"),
-           outdir=out.dir, timepoints=rep(c(11,15,19,23,27,31,35), each=min.n),nCores = 64,
-           outIntegration="noIntegration")
+    meta2d(infile=paste0(out.dir,prefix,".txt"), filestyle="txt",cycMethod = c("LS"),
+           outdir=out.dir, timepoints=this.timepoints,nCores = 40,
+           outIntegration="both")
   }
 }

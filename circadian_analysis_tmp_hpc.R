@@ -1100,7 +1100,7 @@ spliced<-readRDS('~/analysis/circadian/R/JTK.spliced.filtered.16individual.addme
 unspliced<-readRDS('~/analysis/circadian/R/JTK.unspliced.filtered.16individual.addmedianexp.addp2t.rds')
 
 # read spliced metacell file
-spliced.srt<-readRDS('~/analysis/circadian/R/16individual.spliced.srt.rds')
+spliced.srt<-readRDS('~/analysis/core_data/16individual.spliced.srt.rds')
 
 spliced$CycID_Long<-paste0(spliced$CycID,"_",spliced$individual,"_",spliced$celltype)
 unspliced$CycID_Long<-paste0(unspliced$CycID,"_",unspliced$individual,"_",unspliced$celltype)
@@ -1112,26 +1112,56 @@ feature.by.lag<-(spliced.filtered[spliced.filtered$celltype=="CD14-Mono"&
                       spliced.filtered$individual=="KD"&spliced.filtered$fold_peak2trough>1.5,] %>% arrange(LAG))$CycID
 plotGeneExpressionHeatmapByCT(spliced.srt,"CD14-Mono",individual = "KD",gene.list=feature.by.lag)
 
+
+
+
 # read ready regular JTK file
 regular<-readRDS('~/analysis/circadian/R/JTK.result.filtered.16individual.addp2t.addfold2bkg.addmedianexp.bytype.rds')
 
 
 ### calculate correlation of FKBP5 and cortisol
+test<-readRDS('~/analysis/core_data/16individual.srt.annotated.rds')
 test@meta.data$type<-CELL_TYPES2[test@meta.data$predicted.celltype.l2]
-plotPseudobulk(test,"NK",c("FKBP5"),bool.relative = T,bool.debug = T,
-               char.cortisol.file = "~/analysis/circadian/R/ELISA_cortisol.rds")
+test@meta.data$type<-test@meta.data$predicted.celltype.l2
+plotPseudobulk(test,"NK_CD56bright",c("FKBP5"),bool.relative = T,bool.debug = T,
+               char.cortisol.file = "~/analysis/core_data/ELISA_cortisol.rds")
 data<-runtime.plotPseudobulk.mat.final[runtime.plotPseudobulk.mat.final$individual%in%c("JJC","KD","LYH","ZYR"),]
 data<-data[c("features","CT","individual","values")]
-data.fkbp5<-data[data$features=="FKBP5",c("CT","individual","values")]
+data.fkbp5<-data[data$features=="SDHD",c("CT","individual","values")]
 data.cortisol<-data[data$features=="cortisol",c("CT","individual","values")]
-colnames(data.fkbp5)[3]<-"FKBP5"
+colnames(data.fkbp5)[3]<-"SDHD"
 colnames(data.cortisol)[3]<-"cortisol"
 data.merged<-left_join(data.fkbp5,data.cortisol,by=c("CT","individual"))
-cotest<-cor.test(data.merged$FKBP5,data.merged$cortisol,method = "spearman")
-ggplot(data.merged)+geom_point(aes(x=FKBP5,y=cortisol,color=individual))+
-  geom_text(x=-1.2,y=1.5,label=paste0("R=",round(result$estimate,2)," p=",round(result$p.value,2)))+
-  theme_half_open()+scale_color_bmj()
+cotest<-cor.test(data.merged$SDHD,data.merged$cortisol,method = "spearman")
 
+ggplot(data.merged)+geom_point(aes(x=SDHD,y=cortisol,color=individual))+
+  geom_text(x=-1.2,y=1.5,label=paste0("R=",round(cotest$estimate,2)," p=",round(cotest$p.value,2)))+
+  theme_half_open()
+
+#hormone_test<-readRDS("~/analysis/core_data/Correlation.features2hormone.rds")
+hormone_test_byindividual<-readRDS("~/analysis/R/Correlation.features2hormone.byindividual.rds")
+#hormone_test<-hormone_test[!grepl("ENSG",hormone_test$features)&hormone_test$cor2cortisol>0.3,]
+hormone_test_byindividual<-hormone_test_byindividual[!grepl("ENSG",hormone_test_byindividual$features)&
+                                                       hormone_test_byindividual$p.value.cortisol<0.05&hormone_test_byindividual$cor2cortisol>0.3,]
+hormone_test_cortisol_summarise<-hormone_test_byindividual %>% group_by(celltype,individual) %>% summarise(n.correlated2cortisol=n())
+JTK<-readRDS('~/analysis/core_data/JTK.result.filtered.16individual.addp2t.addfold2bkg.addmedianexp.bytype.rds')
+JTK_summarise<-JTK[JTK$individual %in% INDIVIDUALS_BATCH2,] %>% group_by(celltype,individual) %>% summarise(n.oscillating=n())
+hormone_test_cortisol_summarise<-left_join(hormone_test_cortisol_summarise,JTK_summarise,by=c("celltype","individual"))
+hormone_test_cortisol_summarise$ratio<-hormone_test_cortisol_summarise$n.correlated2cortisol/hormone_test_cortisol_summarise$n.oscillating
+hormone_test_cortisol_summarise$celltype_rough<-CELL_TYPES2[hormone_test_cortisol_summarise$celltype]
+ggplot(hormone_test_cortisol_summarise[!is.na(hormone_test_cortisol_summarise$celltype),])+
+  geom_boxplot(aes(x=celltype,y=ratio,fill=celltype_rough))+theme_half_open()+
+  theme(axis.text.x = element_text(angle=60,hjust=1))
+
+### plot metacell to compare with pseudobuk
+test.seacell<-readRDS('~/analysis/core_data/seacell.16individual.TF.rds')
+test.seacell<-NormalizeData(test.seacell,normalization.method = "RC",scale.factor = 1000000)
+plotMetaCellByIndividual(test.seacell,cell.type = "CD14 Mono",feature = "CRY1",
+    layer = "data",merge = F,rm.outliers = T,float.alpha = 0.1,bool.maskzero = F)
+test<-readRDS('~/analysis/core_data/16individual.srt.annotated.rds')
+test$type<-test$predicted.celltype.l2
+test<-NormalizeData(test,normalization.method = "RC",scale.factor = 1000000)
+plotPseudobulk(test,char.cell.type = "CD14 Mono",vector.features = c("PER2","CRY1"))
 
 # compare expression between each subsets
 data.raw<-readRDS('~/analysis/circadian/R/16individual.pseudobulk.bytype.CPM.rds')
@@ -1225,3 +1255,744 @@ ggplot(unique(result[c("features","mean.cor2cortisol","mean.logp.cortisol")]))+
   geom_point(aes(x=mean.cor2cortisol,y=mean.logp.cortisol),alpha=0.5)+
   geom_text_repel(aes(x=mean.cor2cortisol,y=mean.logp.cortisol,label=features))+
   theme_half_open()
+
+# VDJ analysis, BCR
+VDJ.B<-readRDS('analysis/core_data/VDJ.B.clone_types.filtered.rds')
+this.individual<-INDIVIDUALS_BATCH2[4]
+VDJ.B.clone.at.CT<-VDJ.B[c("individual","CT","clone_id")] %>% unique()
+VDJ.B.clone.at.CT<-VDJ.B.clone.at.CT %>% group_by(clone_id,individual) %>% mutate(n.occur=n())
+VDJ.B.clone.at.CT$n.occur %>% table() %>% as.data.frame()
+
+VDJ.B.clone.at.CT<-VDJ.B.clone.at.CT[VDJ.B.clone.at.CT$n.occur==2&VDJ.B.clone.at.CT$individual==this.individual,]
+# Count occurrences per clone per CT
+count_data <- VDJ.B.clone.at.CT %>%
+  count(clone_id, CT) %>%
+  group_by(clone_id) %>%
+  mutate(percent = n / sum(n) * 100)
+
+
+seqential_occur<-data.frame("clone_id"=character(0),"is.sequential"=character(0))
+for (id in unique(count_data$clone_id)) {
+  this.data=count_data[count_data$clone_id==id,]
+  ct.time=this.data$CT %>% gsub("CT","",.) %>% as.numeric()
+  ct.time.min=min(ct.time)
+  if((ct.time.min+4) %in% ct.time){
+    seqential_occur=rbind(seqential_occur,data.frame("clone_id"=id,"is.sequential"="yes"))
+  }else{
+    seqential_occur=rbind(seqential_occur,data.frame("clone_id"=id,"is.sequential"="no"))
+  }
+}
+
+binom.test(x = table(seqential_occur$is.sequential)["yes"], n = nrow(seqential_occur), p = 2/7, alternative = "greater")
+
+plot1<-ggplot(VDJ.B.clone.at.CT, aes(x = clone_id, y = CT, fill = CT)) +
+  geom_tile(color="black") + 
+  labs(title = "Clone Distribution Across Circadian Times",
+       x = paste0("Clone ID of individual ",INDIVIDUAL_MASKING[this.individual]), y = "Circadian time", fill = "Circadian Time") +
+  coord_flip() + scale_y_discrete(expand = c(0,0))+
+  scale_fill_manual(values=c("#FFFFFF","#D4D4D4","#AAAAAA","#555555","#AAAAAA","#D4D4D4","#FFFFFF"))+
+  theme(panel.background = element_rect(fill="white",color="black",linetype = 1),axis.text.y=element_blank(),axis.ticks.y = element_blank())
+
+plot2<-ggplot(seqential_occur)+geom_tile(aes(x="is.sequential",y=clone_id,fill=is.sequential),color="black")+
+  scale_fill_manual(values = c("white","red"))+theme_nothing()+theme(plot.margin = margin(0,1,0,0,"cm"))+
+  scale_y_discrete(expand = c(0,0))+scale_x_discrete(expand = c(0,0))
+
+ggarrange(plot1,plot2,common.legend = T,align = "hv",widths = c(3,1),legend = "bottom")
+
+# VDJ analysis, TCR
+VDJ.T<-readRDS('~/analysis/core_data/VDJ.T.clone_types.filtered.rds')
+this.individual<-INDIVIDUALS_BATCH1[12]
+VDJ.T.clone.at.CT<-VDJ.T[c("individual","CT","clone_id")] %>% unique()
+VDJ.T.clone.at.CT<-VDJ.T.clone.at.CT %>% group_by(clone_id,individual) %>% mutate(n.occur=n())
+VDJ.T.clone.at.CT$n.occur %>% table() %>% as.data.frame()
+
+VDJ.T.clone.at.CT<-VDJ.T.clone.at.CT[VDJ.T.clone.at.CT$n.occur==2&VDJ.T.clone.at.CT$individual==this.individual,]
+# Count occurrences per clone per CT
+count_data <- VDJ.T.clone.at.CT %>%
+  count(clone_id, CT) %>%
+  group_by(clone_id) %>%
+  mutate(percent = n / sum(n) * 100)
+
+seqential_occur<-data.frame("clone_id"=character(0),"is.sequential"=character(0))
+for (id in unique(count_data$clone_id)) {
+  this.data=count_data[count_data$clone_id==id,]
+  ct.time=this.data$CT %>% gsub("CT","",.) %>% as.numeric()
+  ct.time.min=min(ct.time)
+  if((ct.time.min+4) %in% ct.time){
+    seqential_occur=rbind(seqential_occur,data.frame("clone_id"=id,"is.sequential"="yes"))
+  }else{
+    seqential_occur=rbind(seqential_occur,data.frame("clone_id"=id,"is.sequential"="no"))
+  }
+}
+
+binom.test(x = table(seqential_occur$is.sequential)["yes"], n = nrow(seqential_occur), p = 1/3, alternative = "greater")
+order.clone_id<-(seqential_occur %>% arrange(is.sequential))$clone_id
+plot1<-ggplot(VDJ.T.clone.at.CT, aes(x = clone_id, y = CT, fill = CT)) +
+  geom_tile(color="black") + 
+  labs(title = "Clone Distribution Across Circadian Times",
+       x = paste0("Clone ID of individual ",INDIVIDUAL_MASKING[this.individual]), y = "Circadian time", fill = "Circadian Time") +
+  scale_x_discrete(limits=order.clone_id)+scale_y_discrete(expand = c(0,0))+
+  scale_fill_manual(values=c("#FFFFFF","#D4D4D4","#AAAAAA","#555555","#AAAAAA","#D4D4D4","#FFFFFF"))+
+  theme(panel.background = element_rect(fill="white",color="black",linetype = 1),axis.text.x=element_blank(),axis.ticks.x = element_blank())
+
+plot2<-ggplot(seqential_occur)+geom_tile(aes(x=clone_id,y="is.sequential",fill=is.sequential),color="black")+
+  scale_fill_manual(values = c("white","red"))+theme_nothing()+theme(plot.margin = margin(0,0,0,0,"cm"))+
+  scale_y_discrete(expand = c(0,0))+scale_x_discrete(expand = c(0,0),limits=order.clone_id)
+
+ggarrange(plot1,plot2,common.legend = T,ncol = 1,align = "hv",heights = c(3,1),legend = "bottom")
+
+plot.list<-list()
+for(this.individual in c(INDIVIDUALS_BATCH1,INDIVIDUALS_BATCH2)){
+  this.data=VDJ.T[VDJ.T$individual==this.individual,]
+  this.data=this.data[c("CT","clone_id")] %>% unique()
+  this.data=this.data %>% group_by(clone_id) %>% mutate(n.occur=n())
+  plotdata=this.data$n.occur %>% table() %>% as.data.frame()
+  colnames(plotdata)[1]<-"occurrence"
+  plotdata=plotdata %>%
+    arrange(desc(Freq)) %>%
+    mutate(
+      percentage = Freq / sum(Freq) * 100,
+      label_position = cumsum(Freq) - Freq / 2,  # Position for labels
+      label = paste0(occurrence, " (", round(percentage, 1), "%)")
+    )
+  plot.list[[this.individual]]=ggplot(plotdata, aes(x = "", y = Freq, fill = label)) +
+    geom_bar(stat = "identity", width = 1, linewidth = 0.5,color="black") +
+    coord_polar("y", start = 0) +
+    theme_void() +
+    labs(subtitle=INDIVIDUAL_MASKING[this.individual]) +
+    scale_fill_aaas(name="occurrence")+
+    theme(plot.title = element_text(hjust=0.5),text=element_text(size=14,color="black"))
+}
+ggarrange(plotlist = plot.list,ncol=4,nrow=4)
+
+# CYTOF data to confirm rhythmicity of CXCR4
+cytof<-readRDS('~/analysis/core_data/CYTOF.300k.reannotation.srt.rds')
+test<-readRDS('~/analysis/core_data/16individual.srt.annotated.rds')
+test.metacell<-readRDS('~/analysis/core_data/seacell.16individual.TF.rds')
+test$type<-test$predicted.celltype.l2
+test<-NormalizeData(test,normalization.method = "RC",scale.factor = 1000000)
+test.metacell<-NormalizeData(test.metacell,normalization.method = "RC",scale.factor = 1000000)
+
+JTK_CYTOF<-readRDS('~/analysis/core_data/CYTOF.JTK.newresult.filtered.addmedianexp.addp2t.bytype.rds')
+JTK_metacell<-readRDS('~/analysis/core_data/JTK.result.filtered.16individual.addp2t.addfold2bkg.addmedianexp.bytype.rds')
+
+
+this.celltype<-"TNK"
+
+JTK_CYTOF[JTK_CYTOF$celltype==this.celltype&JTK_CYTOF$ADJ.P<0.000001,"CycID"] %>% table() %>% sort()
+
+this.feature<-as.vector(CYTOF2RNA_FEATURES["CD45-plt"])
+#this.feature<-"PER2"
+JTK_metacell[JTK_metacell$CycID==this.feature&JTK_metacell$celltype==this.celltype,]
+JTK_CYTOF[JTK_CYTOF$CycID=="CD184-plt"&JTK_CYTOF$celltype==this.celltype,]
+
+plot1<-plotPseudobulk(test,this.celltype,this.feature,c("KD","JJC","LYH","ZYR"))+
+  ggtitle(paste0("RNA: pseudobulk"))+NoLegend()+xlab("")
+
+plot2<-plotMetaCellByIndividual(test.metacell,this.celltype,this.feature,
+  individuals = c("TF_KD","TF_JJC","TF_LYH","TF_ZYR"),
+  layer="count",float.alpha = 0.07)+xlab("")+
+  ggtitle(paste0("RNA: metacell"))
+
+plot3<-plotRandomPseudobulkByCTByIndividual(srt = cytof,cell.type = this.celltype,
+  individuals = c("TF_KD","TF_JJC","TF_LYH","TF_ZYR"),
+  features=c(RNA2CYTOF[this.feature]),normalize.data=F,proportion = 1,
+  split.by="individual",plot="raw",float.alpha = 1)+NoLegend()+
+  ggtitle(paste0("CYTOF: pseudobulk"))
+
+plot4<-plotCytofbyIndividual(cytof,this.celltype,this.feature,proportion = 1,
+  individuals = c("TF_KD","TF_JJC","TF_LYH","TF_ZYR"))+xlab("")+
+  ggtitle(paste0("CYTOF: raw"))
+
+(plot1|plot2)/(plot3|plot4)+patchwork::plot_annotation(paste0(this.celltype,": ",this.feature))
+
+this.celltype<-"CD16 Mono"
+this.feature<-"CCR4"
+plot1<-plotPseudobulk(test,this.celltype,this.feature)+
+  ggtitle(paste0("RNA: pseudobulk"))+NoLegend()+xlab("")
+
+plot2<-plotMetaCellByIndividual(test.metacell,this.celltype,this.feature,
+                                layer="count",float.alpha = 0.07)+xlab("")+
+  ggtitle(paste0("RNA: metacell"))
+(plot1|plot2)+patchwork::plot_annotation(paste0(this.celltype,": ",this.feature))
+
+cytof@meta.data$type<-CELL_TYPES2[cytof@meta.data$manual.new]
+test@meta.data$type<-CELL_TYPES2[test@meta.data$predicted.celltype.l2]
+test.metacell@meta.data$type<-CELL_TYPES2[test.metacell@meta.data$predicted.celltype.l2.main]
+
+# merge 12 individual velosity data
+mat<-getMultipleWholeDaySplicedData(INDIVIDUALS_BATCH1)
+mat2=list()
+for(sample_id in sort(names(BATCH_JJC))){
+  sample_loom_path=paste0(sample_id,"/outs/per_sample_outs/",sample_id,"/count/velocyto/")
+  sample_loom_file_name=list.files(sample_loom_path)[1]
+  sample_loom_full_path=paste0(sample_loom_path,sample_loom_file_name)
+  message("loom file: ")
+  message(sample_loom_full_path)
+  loomMatrix=read.loom.matrices(sample_loom_full_path)
+  #loomMatrix=subsetLoomMatrix(loomMatrix,cell.preffix=i,cells=cells)
+  colnames(loomMatrix$spliced)=paste(sample_id,colnames(loomMatrix$spliced),sep='_')
+  colnames(loomMatrix$unspliced)=paste(sample_id,colnames(loomMatrix$unspliced),sep='_')
+  colnames(loomMatrix$ambiguous)=paste(sample_id,colnames(loomMatrix$ambiguous),sep='_')
+  mat2[[sample_id]]=loomMatrix
+}
+saveRDS(mat,"~/analysis/circadian/R/scVelocyto.12individual.rds")
+saveRDS(mat2,"~/analysis/circadian/R/scVelocyto.4PooledIndividual.rds")
+
+mat<-readRDS("~/analysis/R/scVelocyto.12individual.rds")
+srts<-loom2SeuratObject("~/analysis/R/scVelocyto.12individual.rds",'~/analysis/R/cell.annotations.manual1_2_NI.predicted2.modforSeacells.tsv')
+
+# compare phase of circadian genes in different cell type
+KD_CD14_Monocyte<-read.delim('FineTypeLevelPseudobulk/meta2d_KD_CD14_Mono.txt')
+KD_CD16_Monocyte<-read.delim('FineTypeLevelPseudobulk/meta2d_KD_B_intermediate.txt')
+
+shared.CG<-intersect(KD_CD14_Monocyte[KD_CD14_Monocyte$meta2d_pvalue<0.05,"CycID"],
+          KD_CD16_Monocyte[KD_CD16_Monocyte$meta2d_pvalue<0.05,"CycID"])
+plotdata<-left_join(KD_CD14_Monocyte[KD_CD14_Monocyte$CycID %in% shared.CG,c("CycID","meta2d_phase")],
+                    KD_CD16_Monocyte[KD_CD16_Monocyte$CycID %in% shared.CG,c("CycID","meta2d_phase")],by="CycID")
+colnames(plotdata)[2:3]<-c("CD14 Monocyte","B memory")
+plotdata2<-gather(plotdata,key="type",value="phase",-CycID)
+plot1<-ggplot(plotdata)+geom_point(aes(x= get("CD14 Monocyte"),y=get("B memory")))+
+  xlab("CD14 Monocyte")+ylab("B memory")+
+  geom_abline(slope = 1,intercept = 0)+theme_minimal(base_size = 13)
+plot2<-ggplot(plotdata2)+geom_density(aes(x=phase,fill=type),alpha=0.3)+
+  theme_minimal(base_size = 13)+theme(legend.position=c(0.8,0.9))+
+  guides(fill=guide_legend(title=NULL))
+ggarrange(plot1,plot2,nrow=2,align="hv")
+
+# impose metacell on pseudobulk
+test.metacell<-readRDS('~/analysis/core_data/seacell.16individual.TF.rds')
+test.table<-readRDS('~/analysis/core_data/16individual.pseudobulk.bytype.CPM.rds')
+test.metacell<-NormalizeData(test.metacell,normalization.method = "RC",scale.factor = 1000000)
+imposeMetaCellOnPseudoBulk(srt.metacell = test.metacell,char.cell.type="CD14 Mono",char.feature="GAPDH",
+                           df.pseudobulk = test.table)
+
+#
+plotPseudobulk(S4.srt = NULL,char.cell.type = "CD14 Mono",vector.features = "LGALS3BP",char.data.from.mat = test.table)
+
+# View pseudo bulk level 
+test.meta2d<-read.delim('~/analysis/R/FineTypeLevelPseudobulk/meta2d_KD_CD14_Mono.txt')
+test.meta2d<-test.meta2d[!is.na(test.meta2d$meta2d_pvalue),]
+test.meta2d[test.meta2d$CycID %in% CIRCADIAN_GENES_MAIN,]
+test.meta2d.filtered<-test.meta2d[test.meta2d$meta2d_pvalue<0.1,]
+meta2d.all<-NULL
+for (file in list.files('~/analysis/R/FineTypeLevelPseudobulk/',pattern = "^meta2d*")) {
+  message(file)
+  this.file=file.path('~/analysis/R/FineTypeLevelPseudobulk',file)
+  this.data=read.delim(this.file)
+  this.data=this.data[!is.na(this.data$meta2d_pvalue),]
+  if(nrow(this.data)==0){
+    next
+  }
+  this.data$individual=getField(file,"_",2)
+  this.data$celltype=getField(file,"_",-c(1,2)) %>% gsub(".txt","",.,fixed = T)
+  if(is.null(meta2d.all)){
+    meta2d.all=this.data
+  }else{
+    meta2d.all=rbind(this.data,meta2d.all)
+  }
+}
+saveRDS(meta2d.all,'~/analysis/core_data/meta2d.pseudobulkByCelltypeByIndividual.rds')
+meta2d.filtered<-meta2d.all[meta2d.all$meta2d_pvalue<0.1&meta2d.all$meta2d_rAMP>=0.25,]
+meta2d.filtered<-meta2d.filtered %>% group_by(CycID,celltype) %>% mutate(n.subset.occurence=n())
+meta2d.filtered<-meta2d.filtered[meta2d.filtered$n.subset.occurence>2,]
+meta2d.filtered$CycID %>% table() %>% sort() %>% tail()
+
+plotPseudobulk(S4.srt = NULL,char.cell.type = "B intermediate",vector.features = "IGLV3-21",char.data.from.mat = test.table)
+
+# calculate heavy chain and light chain expression of TCR and BCR
+test.table<-test.table[,!is.nan(colSums(test.table))]
+i=1
+all_chain=NULL
+names_chain<-c("BCR_light_lambda","BCR_light_kappa","BCR_heavy","TCR_alpha","TCR_beta","TCR_gamma","TCR_delta")
+for(this.pattern in c("IGL[VDJC]","IGK[VDJC]","IGH[AGDVJ]","TRA[VDJC]","TRB[VDJC]","TRG[VDJC]","TRD[VDJC]")){
+  this.data=test.table[grepl(this.pattern,rownames(test.table)),] %>% colSums() %>% as.data.frame()
+  colnames(this.data)[1]=names_chain[i]
+  print(head(this.data))
+  if(is.null(all_chain)){
+    all_chain=this.data
+  }else{
+    all_chain=mergeByRownames(all_chain,this.data)
+    print(head(all_chain))
+  }
+  i=i+1
+}
+all_chain<-as.data.frame(t(all_chain))
+plotPseudobulk(S4.srt = NULL,char.cell.type = "B intermediate",
+               vector.features = "BCR_light_kappa",char.data.from.mat = all_chain)
+
+# merge cells to obtain raw count of metacells
+metadata<-readRDS('~/analysis/core_data/seacell.0.04.16individual.metadata.rds')
+srt<-readRDS('~/analysis/core_data/16individual.srt.annotated.rds')
+srt<-NormalizeData(srt,normalization.method = "RC",scale.factor = 1000000)
+mat<-LayerData(srt,layer = "data")
+available.sc.cells<-colnames(mat)
+rm(srt)
+gc()
+i=1
+metacell.mat=NULL
+for(this.metacell in metadata$SEACell %>% unique()){
+  if(i<=17300){
+    i=i+1
+    next
+  }
+  this.sc.cells=metadata[metadata$SEACell==this.metacell,"index"]
+  this.sc.cells=intersect(this.sc.cells,available.sc.cells)
+  #message(this.metacell)
+  this.mat=NULL
+  if(length(this.sc.cells)==0){
+    next
+  }else if(length(this.sc.cells)==1){
+    this.mat=as.data.frame(mat[,this.sc.cells])
+  }else{
+    this.mat=as.data.frame(rowSums(mat[,this.sc.cells]))
+  }
+  colnames(this.mat)=this.metacell
+  if(is.null(metacell.mat)){
+    metacell.mat=this.mat
+  }else{
+    metacell.mat=mergeByRownames(metacell.mat,this.mat)
+  }
+  i=i+1
+  if(i%%100==0){
+    message(paste0(i,"/",length(metadata$SEACell %>% unique())))
+  }
+}
+saveRDS(metacell.mat,'~/analysis/core_data/seacell.0.04.16individual.matrix.part2.rds')
+
+mat.part1<-readRDS('~/analysis/core_data/seacell.0.04.16individual.matrix.part1.rds')
+mat.part2<-readRDS('~/analysis/core_data/seacell.0.04.16individual.matrix.part2.rds')
+overlapped<-intersect(colnames(mat.part1),colnames(mat.part2))
+mat.part2<-mat.part2[,!(colnames(mat.part2) %in% overlapped)]
+all.equal(rownames(mat.part2),rownames(mat.part1))
+mat.whole<-mergeByRownames(mat.part1,mat.part2)
+rm(mat.part1,mat.part2)
+srt.metacell<-CreateSeuratObject(mat.whole)
+srt.metacell@meta.data$individual<-getField(rownames(srt.metacell@meta.data),"_",1)
+srt.metacell@meta.data$CT<-getField(rownames(srt.metacell@meta.data),"_",2)
+srt.metacell@meta.data$type<-getField(rownames(srt.metacell@meta.data),"_",3)
+srt.metacell@meta.data$type<-gsub("-"," ",srt.metacell@meta.data$type)
+srt.metacell<-RenameCells(srt.metacell,add.cell.id = "TF")
+saveRDS(srt.metacell,'~/analysis/core_data/seacell.0.04.16individual.RawCount.srt.rds')
+srt.metacell<-readRDS('~/analysis/core_data/seacell.0.04.16individual.RawCount.srt.rds')
+srt.metacell<-NormalizeData(srt.metacell,normalization.method = "RC",scale.factor = 1000000)
+
+test.table<-readRDS('~/analysis/core_data/16individual.pseudobulk.bytype.CPM.rds')
+imposeMetaCellOnPseudoBulk(srt.metacell = srt.metacell,char.cell.type="CD14 Mono",char.feature="PER2",
+                           df.pseudobulk = test.table)
+
+meta2d.result<-readRDS('~/analysis/core_data/meta2d.pseudobulkByCelltypeByIndividual.rds')
+meta2d.result[meta2d.result$meta2d_pvalue<=0.01&meta2d.result$CycID=="PER2"&meta2d.result$celltype=="CD14_Mono",]
+plotPseudobulk(char.cell.type = "CD14 Mono",vector.features="PER2",
+               char.data.from.mat=test.table,bool.return.plotdata = T,df.meta2d=meta2d.result,
+               bool.merge = T)
+
+velocyto<-readRDS('~/analysis/R/scVelocyto.12individual.rds')
+# spliced rna data to srt
+spliced.srt.list<-list()
+i=1
+for (individual in names(velocyto)) {
+  for(this.CT in names(velocyto[[individual]])){
+    mat=velocyto[[individual]][[this.CT]]$unspliced
+    mat=mat[!duplicated(rownames(mat)), ]
+    this.srt=CreateSeuratObject(mat)
+    spliced.srt.list[[i]]=this.srt
+    i=i+1
+  }
+}
+spliced.srt<-merge(spliced.srt.list[[1]],spliced.srt.list[2:length(spliced.srt.list)])
+spliced.srt[["RNA"]]<-JoinLayers(spliced.srt[["RNA"]])
+spliced.srt<-RenameCells(spliced.srt,add.cell.id = "TF")
+saveRDS(spliced.srt,"~/analysis/R/scVelocyto.12individual.unspliced.srt.rds")
+head(Cells(spliced.srt))
+rm(spliced.srt.list,spliced.srt)
+rm(velocyto)
+gc(reset = T)
+velocyto<-readRDS('~/analysis/R/scVelocyto.4PooledIndividual.rds')
+test<-readRDS('~/analysis/core_data/4multiplexedindividual.srt.annotated.rds')
+test$raw_id<-paste0(test$sample,"_",test$orig.ident)
+mappings<-as.data.frame(test$raw_id)
+rm(test)
+gc()
+colnames(mappings)[1]="cell_id_old"
+mappings=rownames_to_column(mappings,"cell_id_new")
+mapping_value=mappings$cell_id_new
+mapping_key=mappings$cell_id_old
+names(mapping_value)=mapping_key
+spliced.srt.list<-list()
+i=1
+for(sample in names(velocyto)){
+  mat=as.data.frame(velocyto[[sample]]$unspliced)
+  colnames(mat)=colnames(mat) %>% gsub("_sample_alignments_.*:","_",.) %>% gsub("x$","-1",.)
+  print(head(colnames(mat)))
+  #print(mat[1:3,1:3])
+  mat=mat[colnames(mat) %in% mappings$cell_id_old]
+  
+  colnames(mat)=as.vector(mapping_value[colnames(mat)])
+  mat=mat[!duplicated(rownames(mat)), ]
+  this.srt=CreateSeuratObject(mat)
+  spliced.srt.list[[i]]=this.srt
+  i=i+1
+  gc()
+}
+spliced.srt<-merge(spliced.srt.list[[1]],spliced.srt.list[2:length(spliced.srt.list)])
+spliced.srt[["RNA"]]<-JoinLayers(spliced.srt[["RNA"]])
+spliced.srt2<-readRDS('~/analysis/R/scVelocyto.12individual.unspliced.srt.rds')
+spliced.srt<-merge(spliced.srt,spliced.srt2)
+spliced.srt[["RNA"]]<-JoinLayers(spliced.srt[["RNA"]])
+saveRDS(spliced.srt,'~/analysis/core_data/scVelo.16individual.unspliced.srt.rds')
+
+test<-readRDS('~/analysis/core_data/16individual.srt.annotated.rds')
+valid.cells<-Cells(test)
+meta.data<-test@meta.data[,c("individual","CT","manual.level1","manual.level2","predicted.celltype.l2","manual_NI")]
+rm(test)
+gc()
+srt<-readRDS('~/analysis/core_data/scVelo.16individual.unspliced.srt.rds')
+srt<-subset(srt,cells=valid.cells)
+srt<-AddMetaData(srt,metadata = meta.data)
+srt$type<-srt$predicted.celltype.l2
+srt<-NormalizeData(srt,normalization.method = "RC",scale.factor = 1000000)
+plotPseudobulk(srt,"CD14 Mono",c("PER2"))
+saveRDS(srt,'~/analysis/core_data/scVelo.16individual.unspliced.srt.rds')
+
+srt<-readRDS('~/analysis/core_data/scVelo.16individual.spliced.srt.rds')
+mat<-srt2bulkMatrix(srt,c("individual","CT","type"),layer = "data")
+saveRDS(mat,'~/analysis/core_data/16individual.spliced.pseudobulk.bytype.CPM.rds')
+
+# gene enrichment analysis for genes shared by most cell type/each celltype
+meta2d.result0<-readRDS('~/analysis/core_data/meta2d.pseudobulkByCelltypeByIndividual.rds')
+meta2d.result<-meta2d.result0[meta2d.result0$meta2d_pvalue<=0.05&!grepl("ENSG|LINC",meta2d.result0$CycID)&meta2d.result0$meta2d_rAMP>0.25,]
+meta2d.result<-meta2d.result %>% group_by(CycID,celltype) %>% mutate(n.individual=n())
+meta2d.result<-meta2d.result[meta2d.result$n.individual>=2,]
+meta2d.result<-meta2d.result[c("CycID",'celltype')] %>% unique()
+genes.shared<-meta2d.result$CycID %>% table() %>% sort() %>% tail(100) %>% names()
+result<-enrichGObyHGNC(genes.shared)
+plotdata<-result@result[result@result$pvalue<0.01,] %>% arrange(desc(pvalue))
+plotdata<-plotdata[!duplicated(plotdata$geneID),]
+ggplot(plotdata)+geom_point(aes(x=fct_inorder(Description),color=-log10(pvalue),
+                             y=-log10(pvalue),size=Count))+coord_flip()+
+  xlab("")+ylim(c(1.95,3))+theme_light(base_size = 13)
+
+# compare phase of different celltype
+meta2d.result0<-readRDS('~/analysis/core_data/meta2d.pseudobulkByCelltypeByIndividual.rds')
+meta2d.result<-meta2d.result0[meta2d.result0$meta2d_pvalue<=0.1&!grepl("ENSG|LINC",meta2d.result0$CycID)&meta2d.result0$meta2d_rAMP>0.25,]
+meta2d.result<-meta2d.result %>% group_by(CycID,celltype) %>% mutate(n.individual=n())
+meta2d.result<-meta2d.result[meta2d.result$n.individual>=2,]
+meta2d.result.CD14<-meta2d.result[meta2d.result$celltype %in% c("CD14_Mono"),
+                                      c("CycID","individual","meta2d_phase")]
+colnames(meta2d.result.CD14)[3]="CD14_Mono"
+meta2d.result.CD16<-meta2d.result[meta2d.result$celltype %in% c("CD16_Mono"),
+                                  c("CycID","individual","meta2d_phase")]
+colnames(meta2d.result.CD16)[3]="CD16_Mono"
+meta2d.result.CD14CD16<-left_join(meta2d.result.CD14,meta2d.result.CD16,by=c("CycID","individual"))
+meta2d.result.CD14CD16<-meta2d.result.CD14CD16[!is.na(meta2d.result.CD14CD16$CD16_Mono),]
+ggplot(meta2d.result.CD14CD16)+geom_point(aes(x=CD14_Mono,y=CD16_Mono))+geom_abline(slope = 1,intercept = 0)+
+  geom_abline(slope = 1,intercept = 1,linetype=2)+geom_abline(slope = 1,intercept = -1,linetype=2)+
+  geom_abline(slope = 1,intercept = 4,linetype=2)+geom_abline(slope = 1,intercept = -4,linetype=2)+
+  geom_abline(slope = 1,intercept = 12,linetype=2)+geom_abline(slope = 1,intercept = -12,linetype=2)+
+  geom_point(data=meta2d.result.CD14CD16[meta2d.result.CD14CD16$CycID %in% CIRCADIAN_GENES_MAIN,],
+                  aes(x=CD14_Mono,y=CD16_Mono),shape=21,color="red",stroke=1)+
+  geom_text_repel(data=meta2d.result.CD14CD16[meta2d.result.CD14CD16$CycID %in% CIRCADIAN_GENES_MAIN,],
+            aes(x=CD14_Mono,y=CD16_Mono,label=CycID),hjust=-0.5)+theme_classic2()
+comparePhaseBetweenCellTypes(meta2d.result0,"CD14_Mono","CD16_Mono",float.pvalue = 0.1,float.relative2AMP = 0.3)
+
+plotPeakAmongIndividuals(meta2d.result,mode = "meta2d",gene = "CXCR4")
+
+# using meta2d result to test tauFisher
+meta2d.result0<-readRDS('~/analysis/core_data/meta2d.pseudobulkByCelltypeByIndividual.rds')
+meta2d.result<-meta2d.result0[meta2d.result0$meta2d_pvalue<=0.1&!grepl("ENSG|LINC",meta2d.result0$CycID)&meta2d.result0$meta2d_rAMP>0.25,]
+bulk_by_type<-readRDS("~/analysis/core_data/16individual.pseudobulk.bytype.CPM.rds")
+top.genes<-CIRCADIAN_GENES_MAIN
+predicted.data<-predictIndividualwithTauFisher(data=bulk_by_type,individual = c("KD","JJC","HZD","ZYX","WLG","XSP"),celltype = "CD14_Mono",
+                               predictor.genes = top.genes,bool.include.trained = T,bool.return.pred = T)
+
+# calculate dispersion of inter-individual phase shift between genes within individual
+for (used.celltype in c("CD4_TCM","CD8_TEM","NK","B_memory","B_naive")) {
+  plotdata=NULL
+  for (this.individual in unique(meta2d.result$individual)) {
+    message(this.individual)
+    this.meta2d=meta2d.result[meta2d.result$individual==this.individual&meta2d.result$celltype==used.celltype,c("CycID","meta2d_phase")]
+    for(this.gene in this.meta2d$CycID){
+      this.lag=this.meta2d[this.meta2d$CycID==this.gene,"meta2d_phase"] %>% as.numeric()
+      result=this.meta2d
+      result$CycID2=this.gene
+      result$LAG2=this.lag
+      result$lag_diff=result[,"meta2d_phase"]-result$LAG2
+      result$individual=this.individual
+      if(is.null(plotdata)){
+        plotdata=result
+      }else{
+        plotdata=rbind(plotdata,result)
+      }
+    }
+  }
+  plotdata<-plotdata %>% group_by(CycID,CycID2) %>% mutate(n.pair=n())
+  plotdata$lag_diff<-ifelse(plotdata$lag_diff< -12,plotdata$lag_diff+24,plotdata$lag_diff)
+  plotdata$lag_diff<-ifelse(plotdata$lag_diff> 12,plotdata$lag_diff-24,plotdata$lag_diff)
+  plotdata$celltype<-used.celltype
+  cell.type.str<-gsub(" ","_",used.celltype)
+  saveRDS(plotdata,paste0('~/analysis/R/lag.diffs/lag.diff.',cell.type.str,".rds"))
+}
+
+plotdata<-readRDS('~/analysis/R/lag.diffs/lag.diff.Treg.rds')
+plotdata.filtered<-plotdata[plotdata$n.pair>6,]
+plotdata.filtered<-plotdata.filtered %>% group_by(CycID,CycID2) %>% mutate(sd.lag.diff=sd(lag_diff))
+plotdata.filtered<-plotdata.filtered[c("CycID","CycID2","sd.lag.diff")] %>% unique()
+plotdata.mat<-spread(plotdata.filtered,key="CycID2",value="sd.lag.diff")
+plotdata.mat<-as.data.frame(plotdata.mat)
+plotdata.mat<-column_to_rownames(plotdata.mat,"CycID")
+
+df<-plotdata.filtered
+# First, create the distance matrix as before
+all_cycids <- unique(c(df$CycID, df$CycID2))
+dist_matrix <- matrix(NA, nrow = length(all_cycids), ncol = length(all_cycids),
+                      dimnames = list(all_cycids, all_cycids))
+
+for(i in 1:nrow(df)) {
+  dist_matrix[df$CycID[i], df$CycID2[i]] <- df$sd.lag.diff[i]
+  dist_matrix[df$CycID2[i], df$CycID[i]] <- df$sd.lag.diff[i]
+}
+diag(dist_matrix) <- 0
+
+# Impute missing values with the mean distance
+mean_distance <- mean(dist_matrix, na.rm = TRUE)
+dist_matrix_imputed <- dist_matrix
+dist_matrix_imputed[is.na(dist_matrix_imputed)] <- mean_distance
+
+# Or use a more sophisticated imputation: maximum distance + small buffer
+max_distance <- max(dist_matrix, na.rm = TRUE)
+dist_matrix_imputed <- dist_matrix
+dist_matrix_imputed[is.na(dist_matrix_imputed)] <- max_distance * 1.1
+
+# Now create the heatmap with imputed matrix
+col_fun <- colorRamp2(c(0, max(df$sd.lag.diff, na.rm = TRUE)), 
+                      c("#003366", "#FFEE99"))
+
+ht <- Heatmap(
+  dist_matrix_imputed,
+  name = "Distance",
+  col = col_fun,
+  na_col = "white",
+  
+  # Use the imputed matrix for clustering
+  clustering_distance_rows = function(x) as.dist(dist_matrix_imputed),
+  clustering_distance_columns = function(x) as.dist(dist_matrix_imputed),
+  
+  # CNS-level styling
+  rect_gp = gpar(col = "white", lwd = 0.1),
+  row_names_gp = gpar(fontsize = 6),
+  column_names_gp = gpar(fontsize = 6),
+  heatmap_legend_param = list(
+    title_gp = gpar(fontsize = 9, fontface = "bold"),
+    labels_gp = gpar(fontsize = 8)
+  )
+)
+
+# For PDF (vector format, best for publications)
+svg("distance_heatmap.svg", 
+    width = 25, 
+    height = 25, 
+    pointsize = 8) # CNS standard: 8-10 pt font
+
+draw(ht) # Your Heatmap object
+dev.off() # Essential: closes the graphics device
+
+# Define your genes of interest
+genes_of_interest<-c("PER1", "NR1D2", "BMAL1", "DDIT4", "FKBP5","PER2","PER3","CRY1","CRY2","NR1D1",'CLOCK') # Replace with your actual IDs
+
+# Create the base heatmap without row/column labels
+ht <- Heatmap(
+  dist_matrix_imputed,
+  name = "Phase shift\ndeviation",
+  col = col_fun,
+  na_col = "white",
+  clustering_distance_rows = function(x) as.dist(dist_matrix_imputed),
+  clustering_distance_columns = function(x) as.dist(dist_matrix_imputed),
+  rect_gp = gpar(col = "white", lwd = 0.1),
+  show_row_names = FALSE,    # Turn off all row labels
+  show_column_names = FALSE, # Turn off all column labels
+  heatmap_legend_param = list(
+    title_gp = gpar(fontsize = 9, fontface = "bold"),
+    labels_gp = gpar(fontsize = 8)
+  )
+)
+
+# Add text annotations for specific genes
+# Note: This requires knowing the positions after clustering
+# You might need to run the clustering first to get positions
+
+# Alternative: Use decorate_annotation for more control
+ht <- ht + rowAnnotation(
+  foo = anno_mark(
+    at = which(rownames(dist_matrix_imputed) %in% genes_of_interest),
+    labels = rownames(dist_matrix_imputed)[rownames(dist_matrix_imputed) %in% genes_of_interest],
+    labels_gp = gpar(fontsize = 8),
+    link_gp = gpar(lwd = 0.5),
+    padding = unit(1, "mm")
+  )
+)
+draw(ht) # Your Heatmap object
+
+# differential expression analysis of individuals with good rhythmicity and bad rhythmicity
+mat<-readRDS("~/analysis/core_data/16individual.pseudobulk.bytype.rds")
+mat<-mat[!is.na(colSums(mat))]
+mat<-mat[(colSums(mat))!=0]
+saveRDS(mat,"~/analysis/core_data/16individual.pseudobulk.bytype.rds")
+mat<-readRDS("~/analysis/core_data/16individual.pseudobulk.bytype.rds")
+for (celltype in unique(getField(colnames(mat),"-",3))) {
+  mat.test<-mat[,grepl(celltype,colnames(mat))]
+  mat.test<-rownames_to_column(mat.test,var = "feature")
+  mat.test<-gather(mat.test,key="observation",value="value",-feature)
+  mat.test$individual<-getField(mat.test$observation,"-",1)
+  mat.test<-mat.test %>% group_by(feature,individual) %>% summarise(value=sum(value))
+  mat.test<-spread(mat.test,key="individual",value="value")
+  mat.test<-column_to_rownames(mat.test,var = "feature")
+  mat.test<-mat.test[,colSums(mat.test)!=0]
+  mat.test<-mat.test[rowMin(mat.test %>% as.matrix())>=3,]
+  mat.test<-mat.test[!(grepl("^AC[0-9].*",rownames(mat.test))|grepl("^AL[0-9].*",
+                                                                    rownames(mat.test))|grepl("^FP[0-9].*",rownames(mat.test))),]
+  condition<-INDIVIDUAL2CIRCADIAN_GROUP2[colnames(mat.test)]
+  colData <- data.frame(row.names=colnames(mat.test), condition)
+  
+  #dds<-DESeqDataSetFromMatrix(countData = mat.test, colData = colData, design = ~ condition+dornor)
+  dds<-DESeqDataSetFromMatrix(countData = mat.test, colData = colData, design = ~ condition)
+  dds.res <- DESeq(dds, fitType = 'mean')
+  
+  result<-results(dds.res) %>% as.data.frame()
+  result$significant<-ifelse((-log10(result$padj))>=2&abs(result$log2FoldChange)>1,"yes","no")
+  result$gene<-rownames(result)
+  result<-result[!grepl("ENSG",result$gene),]
+  result<-result[!is.na(result$padj),]
+  gene.list=result[result$significant=="yes","gene"]
+  if(length(gene.list)>10){
+    message(length(gene.list))
+    print(gene.list)
+    enrich.res=enrichGObyHGNC(gene.list,backgroud.genes=rownames(mat.test),ont = "BP")
+    saveRDS(enrich.res,paste0("~/analysis/R/DEseq2/",celltype,"_normal_vs_disordered.enrichGO.rds"))
+  }
+  
+  
+  ggplot(result)+geom_point(aes(x=log2FoldChange,y=-log10(padj),color=significant))+
+    geom_text_repel(data=result[result$significant=="yes",],aes(x=log2FoldChange,y=-log10(padj),label=gene))+
+    geom_hline(yintercept=2,linetype=2)+
+    geom_vline(xintercept=1,linetype=2)+
+    geom_vline(xintercept=-1,linetype=2)+
+    scale_color_manual(values = c("grey","red"))+theme_classic2()+NoLegend()+
+    ggtitle(paste0("Normal vs Disordered, ",celltype))+theme(plot.title = element_text(hjust=0.5))
+  ggsave(paste0("~/analysis/R/DEseq2/",celltype,"_normal_vs_disordered.pdf"),width = 6,height = 7)
+  saveRDS(result,paste0("~/analysis/R/DEseq2/",celltype,"_normal_vs_disordered.rds"))
+  saveRDS(dds.res,paste0("~/analysis/R/DEseq2/",celltype,"_normal_vs_disordered.DESeq2.obj.rds"))
+}
+
+test.deseq<-readRDS('~/analysis/R/DEseq2/CD14_Mono_normal_vs_disordered.DESeq2.obj.rds')
+test.enrichGO<-readRDS('~/analysis/R/DEseq2/CD14_Mono_normal_vs_disordered.enrichGO.rds')
+DESeq2DotPlot(test.deseq)
+enrichGODotPlot(test.enrichGO)
+
+# RNA velosity
+meta2d.all<-NULL
+for (file in list.files('~/analysis/R/FineTypeLevelUnsplicedPseudobulk/',pattern = "^meta2d*")) {
+  message(file)
+  this.file=file.path('~/analysis/R/FineTypeLevelUnsplicedPseudobulk',file)
+  this.data=read.delim(this.file)
+  this.data=this.data[!is.na(this.data$meta2d_pvalue),]
+  if(nrow(this.data)==0){
+    next
+  }
+  this.data$individual=getField(file,"_",2)
+  this.data$celltype=getField(file,"_",-c(1,2)) %>% gsub(".txt","",.,fixed = T)
+  if(is.null(meta2d.all)){
+    meta2d.all=this.data
+  }else{
+    meta2d.all=rbind(this.data,meta2d.all)
+  }
+}
+saveRDS(meta2d.all,'~/analysis/core_data/meta2d.pseudobulkByCelltypeByIndividual.unspliced.rds')
+
+spliced.meta2d0<-readRDS('~/analysis/core_data/meta2d.pseudobulkByCelltypeByIndividual.spliced.rds')
+spliced.meta2d<-filterMeta2dTable(spliced.meta2d0)
+
+unspliced.meta2d0<-readRDS('~/analysis/core_data/meta2d.pseudobulkByCelltypeByIndividual.unspliced.rds')
+unspliced.meta2d<-filterMeta2dTable(unspliced.meta2d0)
+
+holistic.meta2d0<-readRDS('~/analysis/core_data/meta2d.pseudobulkByCelltypeByIndividual.rds')
+holistic.meta2d<-filterMeta2dTable(holistic.meta2d0)
+
+spliced.genes<-unique(spliced.meta2d$CycID)
+unspliced.genes<-unique(unspliced.meta2d$CycID)
+holistic.genes<-unique(holistic.meta2d$CycID)
+my_list <- list(spliced = spliced.genes, unspliced = unspliced.genes, holistic = holistic.genes)
+
+plotVenn(my_list)
+
+spliced.summa<-spliced.meta2d %>% group_by(CycID,individual) %>% summarise(.,phase=median(meta2d_phase))
+colnames(spliced.summa)[3]<-"spliced"
+unspliced.summa<-unspliced.meta2d %>% group_by(CycID,individual) %>% summarise(.,phase=median(meta2d_phase))
+colnames(unspliced.summa)[3]<-"unspliced"
+phases<-left_join(spliced.summa,unspliced.summa,by=c("CycID","individual"))
+phases<-phases[!is.na(phases$spliced)&!is.na(phases$unspliced),]
+phases$diff<-phases$unspliced-phases$spliced
+phases$spliced<-ifelse(phases$diff>12,phases$spliced+24,phases$spliced)
+phases$spliced<-ifelse(phases$diff< -12,phases$spliced-24,phases$spliced)
+phases$diff<-NULL
+phases<-gather(phases,key="status",value="phase",-CycID,-individual)
+
+
+ggplot(phases,aes(x=status,y=phase,fill=status))+geom_boxplot()+
+  scale_x_discrete(limits=c("unspliced","spliced"))+
+  stat_compare_means(method = "wilcox.test",comparisons = list(c("unspliced", "spliced")),label = "p.signif")+
+  theme_half_open()+theme(axis.text.x=element_text(angle=60,hjust=1))+NoLegend()+ylab("peaking time")+xlab("")
+
+# generate matrix for detection of protein rhythmicity
+srt.cytof<-readRDS('~/analysis/core_data/CYTOF.300k.reannotation.srt.rds')
+srt.cytof$type<-srt.cytof$manual.new
+mat<-srt2bulkMatrix(srt.cytof,split.by = c("individual","CT","type"),bool.use.CPHC = T)
+saveRDS(mat,"~/analysis/core_data/CYTOF.5individual.pseudobulk.mat.rds")
+
+meta2d.all<-NULL
+for (file in list.files('~/analysis/R/FineTypeLevelCYTOFPseudobulk/',pattern = "^meta2d*")) {
+  message(file)
+  this.file=file.path('~/analysis/R/FineTypeLevelCYTOFPseudobulk',file)
+  this.data=read.delim(this.file)
+  this.data=this.data[!is.na(this.data$meta2d_pvalue),]
+  if(nrow(this.data)==0){
+    next
+  }
+  this.data$individual=getField(file,"_",2)
+  this.data$celltype=getField(file,"_",-c(1,2)) %>% gsub(".txt","",.,fixed = T)
+  if(is.null(meta2d.all)){
+    meta2d.all=this.data
+  }else{
+    meta2d.all=rbind(this.data,meta2d.all)
+  }
+}
+saveRDS(meta2d.all,'~/analysis/core_data/meta2d.pseudobulkByCelltypeByIndividual.cytof.rds')
+
+
+# explore cortisol regulated genes
+meta2d.result0<-readRDS('~/analysis/core_data/JTK.result.filtered.16individual.addp2t.addfold2bkg.addmedianexp.bytype.rds')
+meta2d.result<-filterMeta2dTable(meta2d.result,float.pvalue.s1 = 0.05,float.pvalue.s2 = 0.05,int.min.individual = 2,mode = "JTK")
+cortisol.experiment.DE.genes0<-read.delim('~/analysis/core_data/GSE148639_processed.txt',header = T,skip = 9)
+cortisol.experiment.DE.genes0<-cortisol.experiment.DE.genes0[1:4]
+cortisol.experiment.DE.genes<-dplyr::filter(cortisol.experiment.DE.genes0,p.value<0.05&abs(Fold.change)>1&Gene.Symbol!="---")
+gene_vector<-cortisol.experiment.DE.genes$Gene.Symbol
+cortisol.regulated.genes<-unlist(strsplit(gene_vector, " /// "))
+all.result=NULL
+for(this.individual in unique(meta2d.result$individual)){
+  this.meta2d.result=meta2d.result[meta2d.result$individual==this.individual,]
+  for(this.celltype in unique(this.meta2d.result$celltype)){
+    this.features=(this.meta2d.result[this.meta2d.result$celltype==this.celltype,] %>% arrange(ADJ.P) %>% head(50))$CycID
+    if(this.celltype=="CD4 TCM"){
+      print(this.features[this.features %in% cortisol.regulated.genes])
+    }
+    ratio.cortisol.regulated=sum(this.features %in% cortisol.regulated.genes)/length(this.features)
+    this.result=data.frame("individual"=this.individual,"celltype"=this.celltype,
+                           "ratio"=ratio.cortisol.regulated,"n.oscillating"=length(this.features))
+    if(is.null(all.result)){
+      all.result=this.result
+    }else{
+      all.result=rbind(all.result,this.result)
+    }
+  }
+}
+ 

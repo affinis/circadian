@@ -2013,7 +2013,7 @@ mat.test<-mat.test[!(grepl("^AC[0-9].*",rownames(mat.test))|grepl("^AL[0-9].*",r
 condition<-factor(getField(colnames(mat.test),"-",3))
 dornor<-factor(getField(colnames(mat.test),"-",1))
 colData <- data.frame(row.names=colnames(mat.test), condition, dornor)
-
+mat.test<-round(mat.test)
 #dds<-DESeqDataSetFromMatrix(countData = mat.test, colData = colData, design = ~ condition+dornor)
 dds<-DESeqDataSetFromMatrix(countData = mat.test, colData = colData, design = ~ condition)
 dds.res <- DESeq(dds, fitType = 'mean')

@@ -1,7 +1,7 @@
 source('~/script/circadian/circadian_core.R')
 
 #FIG. 1B UMAP of PBMC atlas
-test<-readRDS("/tmpdata/LyuLin/analysis/circadian/R/7mixed.integrated.annotated.clean.sct.Azimuth.rds")
+test<-readRDS("~/analysis/16individual.srt.annotated.rds")
 test$type<-test$predicted.celltype.l2
 celltypes<-test$type %>% unique() %>% sort()
 cell_legend_data<-data.frame("type"=celltypes,"pos.x"=rep(1,length(celltypes)),"pos.y"=rev(1:length(celltypes)),"ID"=1:length(celltypes))
@@ -473,7 +473,6 @@ ggarrange(plot1,plot2,nrow=2,ncol=1,align="v",heights = c(6,1))+
   inset_element(legend.plot, left = 0.7, bottom = 0.7, right = 0.95, top = 0.85)
 
 # FIG. S3 XX
-
 JTK_result_all<-readRDS('~/analysis/circadian/R/JTK.result.filtered.16individual.addp2t.addfold2bkg.addmedianexp.bytype.rds')
 JTK_result_all<-JTK_result_all %>% group_by(CycID,celltype) %>% mutate(n.occurance=n())
 JTK_result_filtered<-JTK_result_all[JTK_result_all$fold_peak2trough>=1.5&JTK_result_all$median_expression>10&JTK_result_all$fold_to_background>2,]
